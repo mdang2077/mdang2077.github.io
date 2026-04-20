@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Martin Dang</title>
+<style>
+  :root {
+    --bg: #0d0d0d;
+    --bg2: #141414;
+    --bg3: #1a1a1a;
+    --border: #2a2a2a;
+    --text: #e8e8e8;
+    --muted: #666;
+    --accent: #ff3333;
+    --red: #ff4444;
+    --yellow: #ffcc00;
+    --font: 'Courier New', monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: var(--font); font-size: 14px; line-height: 1.7; min-height: 100vh; }
+
+  /* Smooth accent transitions */
+  a, .logo, .hero-tag, .hero h1 span, .section-title, .lock-icon, .unlock-icon,
+  .challenge-code, .submit-btn, .tag.accent, .stat-val, .project-name,
+  .social-dot, .progress-dot.done, .toggle-btn.active { transition: color 0.5s, border-color 0.5s, background-color 0.5s; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  /* TOP BAR */
+  .topbar {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 16px 32px; border-bottom: 1px solid var(--border);
+    position: sticky; top: 0; background: var(--bg); z-index: 100;
+  }
+  .logo { color: var(--accent); font-size: 16px; font-weight: bold; letter-spacing: 2px; }
+
+  /* TWO-COLUMN LAYOUT */
+  .layout { display: flex; align-items: flex-start; }
+
+  /* LEFT SIDEBAR — scrolls with page */
+  .sidebar {
+    width: 376px; flex-shrink: 0;
+    padding: 48px 32px 48px 36px;
+    border-right: 1px solid var(--border);
+    display: flex; flex-direction: column; gap: 28px;
+  }
+
+  /* Photo — full image, rounded corners, no mask/crop */
+  .hero-photo {
+    width: 100%;
+    border-radius: 16px;
+    object-fit: cover;
+    display: block;
+  }
+
+  /* Hero text */
+  .hero-tag { color: var(--accent); font-size: 13px; letter-spacing: 3px; margin-bottom: 8px; font-weight: bold; }
+  .hero h1 { font-size: 26px; font-weight: bold; letter-spacing: 1px; margin-bottom: 8px; }
+  .hero h1 span { color: var(--accent); }
+  .hero p { color: #aaa; line-height: 1.8; font-size: 13px; }
+
+  /* Terminal info card */
+  .id-card { border: 1px solid var(--accent); border-radius: 6px; overflow: hidden; font-size: 12px; }
+  .id-card-header {
+    background: var(--bg3); border-bottom: 1px solid var(--border);
+    padding: 6px 12px; color: var(--accent); font-size: 11px;
+    letter-spacing: 2px; display: flex; align-items: center; gap: 6px;
+  }
+  .id-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--accent); flex-shrink: 0; }
+  .id-card-body { padding: 12px; display: flex; flex-direction: column; gap: 6px; }
+  .id-row { color: #aaa; }
+  .id-row span { color: var(--accent); }
+
+  /* RIGHT MAIN CONTENT */
+  .main { flex: 1; padding: 48px 40px; min-width: 0; }
+
+  .ctf-explainer {
+    border: 1px solid var(--border); border-radius: 6px;
+    padding: 20px 24px; background: var(--bg2); margin-bottom: 32px;
+  }
+  .ctf-explainer p { color: #aaa; font-size: 13px; line-height: 1.8; margin-bottom: 12px; }
+  .ctf-explainer p:last-child { margin-bottom: 0; }
+  .ctf-explainer strong { color: var(--text); font-weight: normal; }
+  .bypass-row { display: flex; align-items: center; gap: 12px; margin-top: 16px; flex-wrap: wrap; }
+  .bypass-label { color: #ffffff; font-size: 14px; letter-spacing: 1px; font-weight: bold; }
+  .toggle-btn {
+    background: transparent; border: 1px solid #e6a817; color: #e6a817;
+    padding: 6px 14px; font-family: var(--font); font-size: 12px;
+    cursor: pointer; border-radius: 4px; transition: background 0.2s, opacity 0.2s;
+  }
+  .toggle-btn:hover { background: rgba(230,168,23,0.1); opacity: 0.9; }
+  .toggle-btn.active { background: rgba(230,168,23,0.1); }
+
+  .progress-bar { display: flex; gap: 4px; margin-bottom: 40px; align-items: center; }
+  .progress-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--border); transition: background 0.4s; }
+  .progress-dot.done { background: var(--accent); }
+  .progress-label { font-size: 11px; color: var(--muted); margin-left: 8px; }
+
+  .section { margin-bottom: 56px; }
+  .section-header { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
+  .section-title { font-size: 15px; letter-spacing: 4px; color: var(--accent); text-transform: uppercase; font-weight: bold; }
+  .section-divider { flex: 1; height: 1px; background: var(--border); }
+  .lock-icon { font-size: 12px; color: var(--yellow); white-space: nowrap; }
+  .unlock-icon { font-size: 12px; color: var(--accent); white-space: nowrap; }
+
+  .locked-box { border: 1px solid var(--border); border-radius: 6px; padding: 24px; background: var(--bg2); }
+  .challenge-label { font-size: 11px; color: var(--yellow); letter-spacing: 2px; margin-bottom: 8px; }
+  .challenge-desc { color: #aaa; font-size: 13px; margin-bottom: 16px; }
+  .challenge-code {
+    background: var(--bg3); border: 1px solid var(--border); border-radius: 4px;
+    padding: 12px 16px; font-family: var(--font); font-size: 13px; color: var(--accent);
+    margin-bottom: 8px; word-break: break-all; user-select: all;
+  }
+  .challenge-hint { font-size: 11px; color: var(--muted); margin-bottom: 16px; }
+  .input-row { display: flex; gap: 8px; }
+  .challenge-input {
+    flex: 1; background: var(--bg3); border: 1px solid var(--border); border-radius: 4px;
+    padding: 8px 12px; font-family: var(--font); font-size: 13px; color: var(--text); outline: none;
+  }
+  .challenge-input:focus { border-color: var(--accent); }
+  .challenge-input.wrong { border-color: var(--red); animation: shake 0.3s; }
+  @keyframes shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-4px)} 75%{transform:translateX(4px)} }
+  .submit-btn {
+    background: transparent; border: 1px solid var(--accent); color: var(--accent);
+    padding: 8px 16px; font-family: var(--font); font-size: 12px;
+    cursor: pointer; border-radius: 4px; transition: all 0.2s; white-space: nowrap;
+  }
+  .submit-btn:hover { background: rgba(0,255,136,0.1); }
+
+  .content-reveal { display: none; }
+  .content-reveal.visible { display: block; }
+
+  .skills-block { margin-bottom: 24px; }
+  .skills-block-title { font-size: 13px; color: #ffffff; font-weight: bold; letter-spacing: 2px; margin-bottom: 10px; text-transform: uppercase; }
+  .tags { display: flex; flex-wrap: wrap; gap: 8px; }
+  .tag { font-size: 12px; padding: 4px 12px; border: 1px solid var(--border); border-radius: 3px; color: #aaa; letter-spacing: 1px; }
+  .tag.accent { border-color: var(--border); color: #aaa; }
+
+  .ctf-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-top: 8px; }
+  .stat-card { background: var(--bg3); border: 1px solid var(--border); border-radius: 6px; padding: 14px 16px; }
+  .stat-label { font-size: 11px; color: var(--muted); letter-spacing: 1px; margin-bottom: 4px; }
+  .stat-val { font-size: 18px; color: var(--accent); font-weight: bold; }
+  .stat-val.placeholder { color: var(--border); font-size: 14px; }
+
+  .projects-list { display: flex; flex-direction: column; gap: 16px; }
+  a.project-card-link { display: block; text-decoration: none; color: inherit; }
+  a.project-card-link:hover .project-card { border-color: var(--accent); }
+  .project-card { border: 1px solid var(--border); border-radius: 6px; padding: 20px 24px; background: var(--bg2); transition: border-color 0.2s; cursor: pointer; }
+  .project-card:hover { border-color: var(--accent); }
+  .project-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; flex-wrap: wrap; gap: 8px; }
+  .project-name { font-size: 15px; font-weight: bold; color: #ffffff; }
+  .project-langs { display: flex; gap: 6px; flex-wrap: wrap; }
+  .lang-tag { font-size: 10px; padding: 2px 8px; border: 1px solid var(--border); border-radius: 3px; color: var(--muted); letter-spacing: 1px; }
+  .project-desc { color: #aaa; font-size: 13px; line-height: 1.7; }
+
+  .socials-list { display: flex; flex-wrap: wrap; gap: 12px; }
+  .social-link {
+    display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px;
+    border: 1px solid var(--border); border-radius: 4px; color: var(--text); font-size: 13px; transition: all 0.2s;
+  }
+  .social-link:hover { border-color: var(--accent); color: var(--accent); text-decoration: none; }
+  .social-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); flex-shrink: 0; }
+
+  .footer { border-top: 1px solid var(--border); padding: 24px 0; text-align: center; color: var(--muted); font-size: 11px; letter-spacing: 1px; margin-top: 16px; }
+
+  /* Mobile: stack vertically */
+  @media (max-width: 768px) {
+    .layout { flex-direction: column; }
+    .sidebar { width: 100%; position: static; height: auto; border-right: none; border-bottom: 1px solid var(--border); padding: 32px 20px; }
+    .hero-photo { width: 100%; height: auto; }
+    .main { padding: 32px 20px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo">&gt; mdang@portfolio</div>
+</div>
+
+<div class="layout">
+
+  <!-- LEFT SIDEBAR -->
+  <aside class="sidebar">
+    <img class="hero-photo" src="IMG_8288.JPG" alt="Martin Dang" />
+    <div class="hero">
+      <div class="hero-tag">// CybSec Enthusiast</div>
+      <h1>Martin <span>Dang</span></h1>
+      <p>Learning as much as I can everyday; one step forward is still a step forward.</p>
+    </div>
+    <div class="id-card">
+      <div class="id-card-header"><span class="id-dot"></span> user_info.txt</div>
+      <div class="id-card-body">
+        <div class="id-row">pronouns: <span>he/him</span></div>
+        <div class="id-row">school: <span>UC San Diego</span></div>
+        <div class="id-row">major: <span>Math-Computer Science</span></div>
+        <div class="id-row">year: <span>3rd year</span></div>
+        <div class="id-row">status: <span>[ open to work ]</span></div>
+      </div>
+    </div>
+
+    <!-- Contact links — always visible, no puzzle -->
+    <div>
+      <div class="section-header" style="margin-bottom: 14px;">
+        <span class="section-title" style="font-size: 12px; letter-spacing: 3px;">contact</span>
+        <div class="section-divider"></div>
+      </div>
+      <div class="socials-list" style="flex-direction: column; gap: 8px;">
+        <a class="social-link" href="https://github.com/mdang2077" target="_blank"><div class="social-dot"></div>github</a>
+        <a class="social-link" href="https://www.linkedin.com/in/mdang2077/" target="_blank"><div class="social-dot"></div>linkedin</a>
+        <a class="social-link" href="CS_Resume.pdf" target="_blank" rel="noopener noreferrer"><div class="social-dot"></div>resume.pdf</a>
+      </div>
+    </div>
+
+  </aside>
+
+  <!-- RIGHT SCROLLABLE CONTENT -->
+  <main class="main">
+
+    <div class="ctf-explainer">
+      <p>This site is a little different. To explore each section, you'll need to solve a mini puzzle — these are called <strong>Capture The Flag (CTF)</strong> challenges. CTFs are cybersecurity puzzles involving cryptography, reverse engineering, forensics, and more to find a hidden "flag" or answer.</p>
+      <p>Each section below is locked behind one. They're beginner-friendly, so give them a shot!</p>
+      <p>If you just want to see my info without the puzzles, that's totally fine too!</p>
+      <div class="bypass-row">
+        <span class="bypass-label">BYPASS:</span>
+        <button class="toggle-btn" id="toggleBtn" onclick="toggleBypass()">[ skip puzzles ]</button>
+      </div>
+    </div>
+
+    <div class="progress-bar">
+      <div class="progress-dot" id="dot0"></div>
+      <div class="progress-dot" id="dot1"></div>
+      <div class="progress-dot" id="dot2"></div>
+      <span class="progress-label" id="progressLabel">0 / 3 unlocked</span>
+    </div>
+
+    <!-- SECTION 1: SKILLS -->
+    <div class="section">
+      <div class="section-header">
+        <span class="section-title">skills</span>
+        <div class="section-divider"></div>
+        <span id="lock0" class="lock-icon">[ locked ]</span>
+      </div>
+      <div class="locked-box" id="box0">
+        <div class="challenge-label">// challenge_01 :: cryptography</div>
+        <div class="challenge-desc">Decode this Base64-encoded string to find the flag:</div>
+        <div class="challenge-code">U2VjdXJpdHkgaXMgY29vbA==</div>
+        <div class="challenge-hint">hint: in your terminal, try: echo "U2VjdXJpdHkgaXMgY29vbA==" | base64 --decode</div>
+        <div class="input-row">
+          <input class="challenge-input" id="input0" placeholder="enter decoded phrase..." onkeydown="if(event.key==='Enter')check(0)" autocomplete="off" spellcheck="false">
+          <button class="submit-btn" onclick="check(0)">submit &gt;</button>
+        </div>
+        <div id="msg0" style="font-size:12px;margin-top:8px;"></div>
+      </div>
+      <div class="content-reveal" id="reveal0">
+        <div class="skills-block">
+          <div class="skills-block-title">Languages</div>
+          <div class="tags">
+            <span class="tag">Swift</span>
+            <span class="tag">Java</span>
+            <span class="tag">C</span>
+            <span class="tag">Python</span>
+            <span class="tag">SQL</span>
+            <span class="tag">Bash</span>
+          </div>
+        </div>
+        <div class="skills-block">
+          <div class="skills-block-title">Tools &amp; Frameworks</div>
+          <div class="tags">
+            <span class="tag">Wireshark</span>
+            <span class="tag">Xcode</span>
+            <span class="tag">Firebase</span>
+            <span class="tag">OpenSSL</span>
+            <span class="tag">Linux CLI</span>
+            <span class="tag">Firebase Cloud Messaging Push Notifications</span>
+          </div>
+        </div>
+        <div class="skills-block">
+          <div class="skills-block-title">Security</div>
+          <div class="tags">
+            <span class="tag accent">Web Exploitation</span>
+            <span class="tag accent">Prompt Injection</span>
+            <span class="tag accent">Cryptography</span>
+            <span class="tag accent">Reverse Engineering</span>
+            <span class="tag accent">Forensics</span>
+            <span class="tag accent">Binary Exploitation</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SECTION 2: PROJECTS -->
+    <div class="section">
+      <div class="section-header">
+        <span class="section-title">projects</span>
+        <div class="section-divider"></div>
+        <span id="lock1" class="lock-icon">[ locked ]</span>
+      </div>
+      <div class="locked-box" id="box1">
+        <div class="challenge-label">// challenge_02 :: reverse engineering</div>
+        <div class="challenge-desc">This function has been obfuscated. What does it return when x = 2?</div>
+        <div class="challenge-code">f(x) = ((x &lt;&lt; 3) | (x &gt;&gt; 1)) &amp; 0xFF<br>x = 2</div>
+        <div class="challenge-hint">hint: evaluate left shift by 3, OR with right shift by 1, mask with 0xFF</div>
+        <div class="input-row">
+          <input class="challenge-input" id="input1" placeholder="enter answer..." onkeydown="if(event.key==='Enter')check(1)" autocomplete="off" spellcheck="false">
+          <button class="submit-btn" onclick="check(1)">submit &gt;</button>
+        </div>
+        <div id="msg1" style="font-size:12px;margin-top:8px;"></div>
+      </div>
+      <div class="content-reveal" id="reveal1">
+        <div class="projects-list">
+          <a class="project-card-link" href="https://github.com/mdang2077/SHA256_pwcracker" target="_blank" rel="noopener noreferrer">
+          <div class="project-card">
+            <div class="project-top">
+              <span class="project-name">SHA256_pwcracker</span>
+              <div class="project-langs"><span class="lang-tag">C</span><span class="lang-tag">OpenSSL</span></div>
+            </div>
+            <div class="project-desc">Dictionary attack tool that cracks SHA256 hashes against rockyou.txt, detecting exact matches and variations including case permutations (2^n combinations) and leet-speak substitutions (a→@, e→3, o→0, i→1).</div>
+          </div>
+          </a>
+          <a class="project-card-link" href="https://github.com/mdang2077/Chat-Server" target="_blank" rel="noopener noreferrer">
+          <div class="project-card">
+            <div class="project-top">
+              <span class="project-name">HTTP Chat Server</span>
+              <div class="project-langs"><span class="lang-tag">C</span></div>
+            </div>
+            <div class="project-desc">Built a lightweight HTTP server from scratch in C supporting real-time messaging with post, react, edit, and history endpoints — handling up to 100,000 messages over plain HTTP GET requests.</div>
+          </div>
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <!-- SECTION 3: EXTRA PUZZLE -->
+    <div class="section">
+      <div class="section-header">
+        <span class="section-title">extra puzzle</span>
+        <div class="section-divider"></div>
+        <span id="lock2" class="lock-icon">[ locked ]</span>
+      </div>
+      <div class="locked-box" id="box2">
+        <div class="challenge-label">// challenge_03 :: forensics</div>
+        <div class="challenge-desc">Every file has a magic number — a sequence of bytes at the start that identifies its type. What file type has this header?</div>
+        <div class="challenge-code">89 50 4E 47 0D 0A 1A 0A</div>
+        <div class="challenge-hint">hint: open a .png in a hex editor and check the first 8 bytes</div>
+        <div class="input-row">
+          <input class="challenge-input" id="input2" placeholder="enter file type..." onkeydown="if(event.key==='Enter')check(2)" autocomplete="off" spellcheck="false">
+          <button class="submit-btn" onclick="check(2)">submit &gt;</button>
+        </div>
+        <div id="msg2" style="font-size:12px;margin-top:8px;"></div>
+      </div>
+      <div class="content-reveal" id="reveal2">
+        <div style="border: 1px solid var(--accent); border-radius: 6px; padding: 20px 24px; background: var(--bg2);">
+          <div style="font-size: 11px; color: var(--accent); letter-spacing: 2px; margin-bottom: 8px;">// access_granted</div>
+          <div style="color: #aaa; font-size: 13px; line-height: 1.8;">congrats — you actually know your magic bytes. not bad for a visitor 👾</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="footer">&copy; 2026 martin dang &nbsp;|&nbsp; built with curiosity</div>
+
+  </main>
+</div>
+
+<script>
+  const answers = ['security is cool', '17', 'png'];
+  const solved = [false, false, false];
+  let bypass = false;
+  let solvedCount = 0;
+
+  function setAccent(green) {
+    document.documentElement.style.setProperty('--accent', green ? '#00ff88' : '#ff3333');
+  }
+  function checkAccentState() { setAccent(bypass || solvedCount === 3); }
+
+  function check(i) {
+    const input = document.getElementById('input' + i);
+    const msg = document.getElementById('msg' + i);
+    const val = input.value.trim().toLowerCase();
+    if (val === answers[i]) {
+      unlock(i);
+      msg.style.color = '#00ff88';
+      msg.textContent = '// access granted';
+    } else {
+      input.classList.add('wrong');
+      msg.style.color = '#ff4444';
+      msg.textContent = '// incorrect. try again.';
+      setTimeout(() => input.classList.remove('wrong'), 400);
+    }
+  }
+
+  function unlock(i) {
+    solved[i] = true; solvedCount++;
+    document.getElementById('box' + i).style.display = 'none';
+    document.getElementById('reveal' + i).classList.add('visible');
+    document.getElementById('lock' + i).textContent = '[ unlocked ]';
+    document.getElementById('lock' + i).className = 'unlock-icon';
+    document.getElementById('dot' + i).classList.add('done');
+    document.getElementById('progressLabel').textContent = solvedCount + ' / 3 unlocked';
+    checkAccentState();
+  }
+
+  function toggleBypass() {
+    bypass = !bypass;
+    const btn = document.getElementById('toggleBtn');
+    if (bypass) {
+      btn.classList.add('active');
+      btn.textContent = '[ enable puzzles ]';
+      for (let i = 0; i < 3; i++) {
+        if (!solved[i]) {
+          document.getElementById('box' + i).style.display = 'none';
+          document.getElementById('reveal' + i).classList.add('visible');
+          document.getElementById('lock' + i).textContent = '[ bypassed ]';
+          document.getElementById('lock' + i).style.color = '#666';
+          document.getElementById('lock' + i).className = 'lock-icon';
+        }
+      }
+    } else {
+      btn.classList.remove('active');
+      btn.textContent = '[ skip puzzles ]';
+      for (let i = 0; i < 3; i++) {
+        if (!solved[i]) {
+          document.getElementById('box' + i).style.display = 'block';
+          document.getElementById('reveal' + i).classList.remove('visible');
+          document.getElementById('lock' + i).textContent = '[ locked ]';
+          document.getElementById('lock' + i).style.color = '';
+          document.getElementById('lock' + i).className = 'lock-icon';
+        }
+      }
+    }
+    checkAccentState();
+  }
+</script>
+</body>
+</html>
