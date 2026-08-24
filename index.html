@@ -6,6 +6,23 @@
 <title>Martin Dang</title>
 <meta name="description" content="Martin Dang — cybersecurity enthusiast, Math-Computer Science at UC San Diego. Portfolio gated behind beginner-friendly CTF challenges.">
 <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<script>
+  /* The one inline script on the page. It must run before first paint,
+     so it is blocking and deliberately tiny: resolve the theme from an
+     explicit choice, else the OS preference, and stamp it on <html>.
+     Any failure falls back to dark rather than leaving it unset. */
+  (function () {
+    try {
+      var t = localStorage.getItem('theme');
+      if (t !== 'dark' && t !== 'light') {
+        t = matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+      }
+      document.documentElement.dataset.theme = t;
+    } catch (e) {
+      document.documentElement.dataset.theme = 'dark';
+    }
+  })();
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&family=VT323&display=swap" rel="stylesheet">
@@ -21,7 +38,10 @@
 
 <header class="topbar">
   <div class="logo">&gt; mdang@portfolio</div>
-  <div class="topbar-right">v2.0 :: ctf_edition</div>
+  <div class="topbar-right">
+    <span class="topbar-meta">v2.0 :: ctf_edition</span>
+    <button class="theme-toggle" type="button" data-theme-toggle aria-label="Switch to light theme">--theme=<span class="theme-toggle-value" data-theme-value>dark</span></button>
+  </div>
 </header>
 
 <div class="layout">

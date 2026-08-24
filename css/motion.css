@@ -31,6 +31,56 @@
   animation: unlock-flash var(--dur-flash) var(--ease-out);
 }
 
+/* ── THEME SWAP ──────────────────────────────────────────────
+   The crossfade exists only while a swap is in flight: theme.js
+   adds the class, flips the attribute, then drops the class. No
+   element carries a permanent global transition, which is what
+   made the v2 rule unmaintainable. Gradient fills snap rather
+   than interpolate; browsers with View Transitions never reach
+   this path and crossfade the whole frame instead. */
+:root.is-theme-switching,
+:root.is-theme-switching *,
+:root.is-theme-switching *::before,
+:root.is-theme-switching *::after {
+  transition:
+    background-color var(--dur-theme) var(--ease-standard),
+    border-color     var(--dur-theme) var(--ease-standard),
+    color            var(--dur-theme) var(--ease-standard),
+    box-shadow       var(--dur-theme) var(--ease-standard),
+    text-shadow      var(--dur-theme) var(--ease-standard),
+    opacity          var(--dur-theme) var(--ease-standard) !important;
+}
+
+/* ── VIEW TRANSITION ─────────────────────────────────────────
+   Progressive enhancement: where `startViewTransition` exists the
+   new theme is wiped in as a circle growing from the toggle. The
+   origin and radius come from theme.js. Everything degrades to
+   the crossfade above, and both are skipped under reduced motion. */
+@media (prefers-reduced-motion: no-preference) {
+  ::view-transition-old(root) {
+    animation: none;
+    mix-blend-mode: normal;
+    z-index: 0;
+  }
+
+  ::view-transition-new(root) {
+    animation: theme-reveal var(--dur-reveal) var(--ease-out);
+    mix-blend-mode: normal;
+    z-index: 1;
+  }
+
+  @keyframes theme-reveal {
+    from {
+      clip-path: circle(0
+        at var(--theme-origin-x, 50%) var(--theme-origin-y, 0%));
+    }
+    to {
+      clip-path: circle(var(--theme-origin-r, 150%)
+        at var(--theme-origin-x, 50%) var(--theme-origin-y, 0%));
+    }
+  }
+}
+
 /* ── REDUCED MOTION ──────────────────────────────────────────
    One global guard. Content stays instant, complete and fully
    usable — no decorative loop, no flash, no scrubbed effect.
@@ -51,5 +101,14 @@
   .reveal.is-visible,
   .challenge-input.is-wrong {
     animation: none !important;
+  }
+
+  /* Beats the theme-swap rule's own !important. theme.js also
+     declines to add the class, so this is belt and braces. */
+  :root.is-theme-switching,
+  :root.is-theme-switching *,
+  :root.is-theme-switching *::before,
+  :root.is-theme-switching *::after {
+    transition-duration: 0.01ms !important;
   }
 }

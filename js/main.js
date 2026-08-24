@@ -3,6 +3,7 @@
    ============================================================ */
 
 import { initCtf } from './ctf.js';
+import { initTheme } from './theme.js';
 
 /* Fallback gate for engines without `@media (scripting)`. Modern
    engines have already hidden the reveals before first paint. */
@@ -15,4 +16,5 @@ export const prefersReducedMotion = window.matchMedia(
   '(prefers-reduced-motion: reduce)',
 ).matches;
 
+initTheme({ prefersReducedMotion });
 initCtf();

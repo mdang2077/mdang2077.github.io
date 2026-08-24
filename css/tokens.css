@@ -73,6 +73,8 @@
   --dur-mid:     300ms;
   --dur-slow:    400ms;
   --dur-accent:  500ms;   /* locked -> solved accent crossfade */
+  --dur-theme:   350ms;   /* dark <-> light crossfade */
+  --dur-reveal:  450ms;   /* view-transition circular reveal */
   --dur-flash:   800ms;   /* unlock flash */
 
   --ease-standard: ease;
@@ -95,50 +97,151 @@
       background   var(--dur-fast) var(--ease-standard),
       box-shadow   var(--dur-fast) var(--ease-standard);
 
-  /* ── SURFACES (dark theme) ─────────────────────────────── */
-  --bg:           #080c0a;
-  --surface-1:    #0e1210;
-  --surface-2:    #131a16;
-  --surface-3:    #1a2420;
-  --surface-sunk: rgba(14, 18, 16, 0.6);   /* id-card body */
-  --bg-glass:     rgba(8, 12, 10, 0.85);   /* sticky header */
+  /* ══════════════════════════════════════════════════════════
+     PALETTE — every colour literal in the codebase, defined
+     exactly once. The activation blocks further down are purely
+     mechanical remaps, so changing a colour means editing one
+     line here and nowhere else.
+     ══════════════════════════════════════════════════════════ */
 
-  --border:        #1e2e28;
-  --border-strong: #2a3d35;
+  /* ── DARK ──────────────────────────────────────────────── */
+  --dark-bg:             #080c0a;
+  --dark-surface-1:      #0e1210;
+  --dark-surface-2:      #131a16;
+  --dark-surface-3:      #1a2420;
+  --dark-surface-inset:  #080c0a;
+  --dark-surface-sunk:   rgba(14, 18, 16, 0.6);
+  --dark-bg-glass:       rgba(8, 12, 10, 0.85);
 
-  --text:       #d4e8dc;
-  --text-muted: #4a6358;
-  --text-dim:   #666666;   /* bypassed lock badge */
+  --dark-border:         #1e2e28;
+  --dark-border-strong:  #2a3d35;
+
+  --dark-text:           #d4e8dc;
+  --dark-text-muted:     #6b8a7c;
+  --dark-text-dim:       #666666;
+
+  --dark-locked-h: 0;    --dark-locked-s: 100%;  --dark-locked-l: 60%;  /* #ff3333 */
+  --dark-solved-h: 152;  --dark-solved-s: 100%;  --dark-solved-l: 50%;  /* #00ff88 */
+
+  --dark-success:     #00ff88;
+  --dark-danger:      #ff4444;
+  --dark-warn:        #ffcc00;
+  --dark-amber:       #e6a817;
+  --dark-amber-wash:  rgba(230, 168, 23, 0.12);
+  --dark-amber-glow:  rgba(230, 168, 23, 0.2);
+  --dark-danger-wash: rgba(255, 68, 68, 0.1);
+
+  --dark-scanline:      rgba(0, 0, 0, 0.08);
+  --dark-grain-opacity: 0.035;
+  --dark-pulse-ring-1:  rgba(255, 255, 255, 0.05);
+  --dark-pulse-ring-2:  rgba(255, 255, 255, 0.04);
+
+  --dark-glow-alpha-lg: 0.15;
+  --dark-glow-alpha-md: 0.08;
+  --dark-glow-alpha-sm: 0.04;
+
+  /* ── LIGHT — "paper terminal" ───────────────────────────────
+     Warm off-white ground with dark ink, not an inversion. The
+     accent hues survive; their lightness drops so they hold AA
+     on paper. CRT bloom does not survive — text glow goes to
+     transparent, because a coloured halo on a light ground reads
+     as smudge, not emission. */
+  --light-bg:             #f4f1ea;
+  --light-surface-1:      #eeeae1;
+  --light-surface-2:      #e7e2d7;
+  --light-surface-3:      #ded8ca;
+  --light-surface-inset:  #e5dfd3;
+  --light-surface-sunk:   rgba(238, 234, 225, 0.6);
+  --light-bg-glass:       rgba(244, 241, 234, 0.85);
+
+  --light-border:         #d5cec0;
+  --light-border-strong:  #bdb4a2;
+
+  --light-text:           #1a201c;
+  --light-text-muted:     #55655b;
+  --light-text-dim:       #8a8378;
+
+  --light-locked-h: 0;    --light-locked-s: 71%;  --light-locked-l: 42%;  /* #b71f1f */
+  --light-solved-h: 152;  --light-solved-s: 90%;  --light-solved-l: 23%;  /* #066f3e */
+
+  --light-success:     #0a6b3f;
+  --light-danger:      #b02020;
+  --light-warn:        #7d5c0a;
+  --light-amber:       #785709;
+  --light-amber-wash:  rgba(120, 87, 9, 0.1);
+  --light-amber-glow:  rgba(120, 87, 9, 0.18);
+  --light-danger-wash: rgba(176, 32, 32, 0.1);
+
+  --light-scanline:      rgba(0, 0, 0, 0.035);
+  --light-grain-opacity: 0.028;
+  --light-pulse-ring-1:  rgba(0, 0, 0, 0.06);
+  --light-pulse-ring-2:  rgba(0, 0, 0, 0.05);
+
+  --light-glow-alpha-lg: 0.12;
+  --light-glow-alpha-md: 0.07;
+  --light-glow-alpha-sm: 0.04;
+
+  /* ── ACTIVE THEME — dark is the default ────────────────── */
+  color-scheme: dark;
+
+  --bg:            var(--dark-bg);
+  --surface-1:     var(--dark-surface-1);
+  --surface-2:     var(--dark-surface-2);
+  --surface-3:     var(--dark-surface-3);
+  --surface-inset: var(--dark-surface-inset);
+  --surface-sunk:  var(--dark-surface-sunk);
+  --bg-glass:      var(--dark-bg-glass);
+
+  --border:        var(--dark-border);
+  --border-strong: var(--dark-border-strong);
+
+  --text:          var(--dark-text);
+  --text-muted:    var(--dark-text-muted);
+  --text-dim:      var(--dark-text-dim);
+
+  --locked-h: var(--dark-locked-h);
+  --locked-s: var(--dark-locked-s);
+  --locked-l: var(--dark-locked-l);
+  --solved-h: var(--dark-solved-h);
+  --solved-s: var(--dark-solved-s);
+  --solved-l: var(--dark-solved-l);
+
+  --success:     var(--dark-success);
+  --danger:      var(--dark-danger);
+  --warn:        var(--dark-warn);
+  --amber:       var(--dark-amber);
+  --amber-wash:  var(--dark-amber-wash);
+  --amber-glow:  var(--dark-amber-glow);
+  --danger-wash: var(--dark-danger-wash);
+
+  --scanline:      var(--dark-scanline);
+  --grain-opacity: var(--dark-grain-opacity);
+  --pulse-ring-1:  var(--dark-pulse-ring-1);
+  --pulse-ring-2:  var(--dark-pulse-ring-2);
+
+  --glow-alpha-lg: var(--dark-glow-alpha-lg);
+  --glow-alpha-md: var(--dark-glow-alpha-md);
+  --glow-alpha-sm: var(--dark-glow-alpha-sm);
+
+  /* CRT text bloom — a dark-theme phenomenon; light sets it
+     transparent rather than tinting ink with a coloured halo. */
+  --text-glow:      var(--glow-lg);
+  --text-glow-soft: var(--glow-md);
 
   /* ── ACCENT ────────────────────────────────────────────────
      Expressed as HSL channels so every glow derives from the hue
      rather than being hand-written. `data-solved` on <html> flips
      the hue; it is an attribute, not an inline style, so it
-     composes with `data-theme` (phase 2) instead of overriding it. */
-  --accent-h: 0;
-  --accent-s: 100%;
-  --accent-l: 60%;         /* hsl(0 100% 60%) === #ff3333 */
+     composes with `data-theme` instead of overriding it. */
+  --accent-h: var(--locked-h);
+  --accent-s: var(--locked-s);
+  --accent-l: var(--locked-l);
 
   --accent: hsl(var(--accent-h) var(--accent-s) var(--accent-l));
 
-  --glow-lg: hsl(var(--accent-h) var(--accent-s) var(--accent-l) / 0.15);
-  --glow-md: hsl(var(--accent-h) var(--accent-s) var(--accent-l) / 0.08);
-  --glow-sm: hsl(var(--accent-h) var(--accent-s) var(--accent-l) / 0.04);
-
-  /* ── FIXED SIGNAL COLOURS (independent of accent state) ── */
-  --success: #00ff88;
-  --danger:  #ff4444;
-  --warn:    #ffcc00;
-  --amber:   #e6a817;
-  --amber-wash:  rgba(230, 168, 23, 0.12);
-  --amber-glow:  rgba(230, 168, 23, 0.2);
-  --danger-wash: rgba(255, 68, 68, 0.1);
-
-  /* ── OVERLAY / TEXTURE ─────────────────────────────────── */
-  --scanline:      rgba(0, 0, 0, 0.08);
-  --grain-opacity: 0.035;
-  --pulse-ring-1:  rgba(255, 255, 255, 0.05);
-  --pulse-ring-2:  rgba(255, 255, 255, 0.04);
+  --glow-lg: hsl(var(--accent-h) var(--accent-s) var(--accent-l) / var(--glow-alpha-lg));
+  --glow-md: hsl(var(--accent-h) var(--accent-s) var(--accent-l) / var(--glow-alpha-md));
+  --glow-sm: hsl(var(--accent-h) var(--accent-s) var(--accent-l) / var(--glow-alpha-sm));
 
   /* ── ELEVATION / GLOW LEVELS ───────────────────────────── */
   --elev-photo:
@@ -158,16 +261,124 @@
   --breakpoint-md: 768px;
 
   /* ── Z-INDEX ───────────────────────────────────────────── */
-  --z-grain:   0;
+  --z-grain:    0;
   --z-scanline: 1;
-  --z-content: 2;
-  --z-header:  100;
+  --z-content:  2;
+  --z-header:   100;
 }
 
-/* Solved / bypassed: the accent hue rotates red -> green.
-   hsl(152 100% 50%) === #00ff88, matching the v2 value exactly. */
+/* ══════════════════════════════════════════════════════════════
+   THEME ACTIVATION
+
+   Three states, in precedence order:
+     1. an explicit choice          -> [data-theme="light"|"dark"]
+     2. no choice, system is light  -> the media block below
+     3. no choice, system is dark   -> the :root defaults above
+
+   The inline script in <head> resolves 1 and 2 into an explicit
+   attribute before first paint, so there is no flash. The media
+   block is what keeps state 2 correct when that script never
+   runs — JavaScript disabled, or blocked.
+   ══════════════════════════════════════════════════════════════ */
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    color-scheme: light;
+
+    --bg:            var(--light-bg);
+    --surface-1:     var(--light-surface-1);
+    --surface-2:     var(--light-surface-2);
+    --surface-3:     var(--light-surface-3);
+    --surface-inset: var(--light-surface-inset);
+    --surface-sunk:  var(--light-surface-sunk);
+    --bg-glass:      var(--light-bg-glass);
+
+    --border:        var(--light-border);
+    --border-strong: var(--light-border-strong);
+
+    --text:          var(--light-text);
+    --text-muted:    var(--light-text-muted);
+    --text-dim:      var(--light-text-dim);
+
+    --locked-h: var(--light-locked-h);
+    --locked-s: var(--light-locked-s);
+    --locked-l: var(--light-locked-l);
+    --solved-h: var(--light-solved-h);
+    --solved-s: var(--light-solved-s);
+    --solved-l: var(--light-solved-l);
+
+    --success:     var(--light-success);
+    --danger:      var(--light-danger);
+    --warn:        var(--light-warn);
+    --amber:       var(--light-amber);
+    --amber-wash:  var(--light-amber-wash);
+    --amber-glow:  var(--light-amber-glow);
+    --danger-wash: var(--light-danger-wash);
+
+    --scanline:      var(--light-scanline);
+    --grain-opacity: var(--light-grain-opacity);
+    --pulse-ring-1:  var(--light-pulse-ring-1);
+    --pulse-ring-2:  var(--light-pulse-ring-2);
+
+    --glow-alpha-lg: var(--light-glow-alpha-lg);
+    --glow-alpha-md: var(--light-glow-alpha-md);
+    --glow-alpha-sm: var(--light-glow-alpha-sm);
+
+    --text-glow:      transparent;
+    --text-glow-soft: transparent;
+  }
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+
+  --bg:            var(--light-bg);
+  --surface-1:     var(--light-surface-1);
+  --surface-2:     var(--light-surface-2);
+  --surface-3:     var(--light-surface-3);
+  --surface-inset: var(--light-surface-inset);
+  --surface-sunk:  var(--light-surface-sunk);
+  --bg-glass:      var(--light-bg-glass);
+
+  --border:        var(--light-border);
+  --border-strong: var(--light-border-strong);
+
+  --text:          var(--light-text);
+  --text-muted:    var(--light-text-muted);
+  --text-dim:      var(--light-text-dim);
+
+  --locked-h: var(--light-locked-h);
+  --locked-s: var(--light-locked-s);
+  --locked-l: var(--light-locked-l);
+  --solved-h: var(--light-solved-h);
+  --solved-s: var(--light-solved-s);
+  --solved-l: var(--light-solved-l);
+
+  --success:     var(--light-success);
+  --danger:      var(--light-danger);
+  --warn:        var(--light-warn);
+  --amber:       var(--light-amber);
+  --amber-wash:  var(--light-amber-wash);
+  --amber-glow:  var(--light-amber-glow);
+  --danger-wash: var(--light-danger-wash);
+
+  --scanline:      var(--light-scanline);
+  --grain-opacity: var(--light-grain-opacity);
+  --pulse-ring-1:  var(--light-pulse-ring-1);
+  --pulse-ring-2:  var(--light-pulse-ring-2);
+
+  --glow-alpha-lg: var(--light-glow-alpha-lg);
+  --glow-alpha-md: var(--light-glow-alpha-md);
+  --glow-alpha-sm: var(--light-glow-alpha-sm);
+
+  --text-glow:      transparent;
+  --text-glow-soft: transparent;
+}
+
+/* Solved / bypassed: the accent hue rotates red -> green, within
+   whichever theme is active. */
 :root[data-solved="true"] {
-  --accent-h: 152;
-  --accent-s: 100%;
-  --accent-l: 50%;
+  --accent-h: var(--solved-h);
+  --accent-s: var(--solved-s);
+  --accent-l: var(--solved-l);
 }
