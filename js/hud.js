@@ -40,9 +40,10 @@ function cursorEl() {
 export function initHud() {
   const rail = document.querySelector('[data-pin-rail]');
   const log = document.querySelector('[data-run-log]');
+  const lockTitle = document.querySelector('[data-lock-title]');
   const idleLine = log && log.querySelector('[data-run-log-idle]');
 
-  if (!rail && !log) return;
+  if (!rail && !log && !lockTitle) return;
 
   const pins = rail ? Array.from(rail.querySelectorAll('[data-pin]')) : [];
 
@@ -130,6 +131,17 @@ export function initHud() {
     if (last) last.el.append(cursorEl());
   }
 
+  /* LOCK_SPEC §8: the <title> tracks state. The live announcement
+     stays on the section — the progress role=status label and the
+     .challenge-msg regions already carry it, and a live region on
+     the lock would be a third announcement of one event. */
+  function renderLockTitle(detail) {
+    if (!lockTitle) return;
+    const open = detail.bypass || detail.count === detail.total;
+    const text = open ? 'Padlock, unlocked' : 'Padlock, locked';
+    if (lockTitle.textContent !== text) lockTitle.textContent = text;
+  }
+
   function renderPins(detail) {
     pins.forEach((pin, i) => {
       const state = detail.solved[i] ? 'seated' : detail.bypass ? 'shim' : 'empty';
@@ -140,5 +152,6 @@ export function initHud() {
   document.addEventListener('ctf:state', (event) => {
     renderPins(event.detail);
     renderLog(event.detail);
+    renderLockTitle(event.detail);
   });
 }

@@ -82,6 +82,14 @@ export function initTheme({ prefersReducedMotion = false } = {}) {
       const next = theme === 'dark' ? 'light' : 'dark';
       button.setAttribute('aria-label', `Switch to ${next} theme`);
     }
+
+    /* The counterpart to `ctf:state`. Everything CSS-driven
+       re-themes from the attribute alone; the WebGL lock cannot,
+       because its materials and environment map live outside the
+       cascade. This is the one outbound edge of this module. */
+    document.dispatchEvent(
+      new CustomEvent('theme:change', { detail: { theme } }),
+    );
   }
 
   function crossfade(theme) {

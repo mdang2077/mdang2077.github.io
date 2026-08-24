@@ -1,210 +1,259 @@
 /* ============================================================
-   LOCK — the hero padlock's specular sweep.
+   LOCK — orchestrator for the hero padlock.
 
-   The band is a real SVG mask sweep: a linear gradient painted
-   on a rect that travels across the lock, clipped to the lock's
-   own geometry by `mask="url(#lock-mask)"`. It never spills onto
-   the background, which is the difference between light moving
-   across metal and a CSS shimmer.
+   Owns three things and delegates the rest:
 
-   Two drivers, and they take turns:
-     - an ambient idle loop, so the effect is discoverable
-       without scrolling;
-     - a scroll scrub over the hero's scroll-out range, which
-       cancels the idle loop on the first scroll input.
+     1. which rendering is on screen — SVG always, WebGL as an
+        upgrade painted over it;
+     2. the scroll shine, as one normalised scalar shared by both
+        paths;
+     3. the lock's state machine, `setState(state, { animate })`.
 
-   Everything here is optional. With GSAP missing the module
-   returns a no-op controller and motion.css runs a CSS-only
-   ambient sweep instead; under reduced motion neither runs.
+   The SVG is not a degraded alternative that renders when WebGL
+   fails. It is what the page ships, always, and it is already on
+   screen and already correct before this module runs. Getting that
+   backwards is what puts a hole in the page on slow connections.
+   So there is no `try` at the feature level here: every WebGL
+   branch is an addition, and every failure path is "do nothing".
    ============================================================ */
 
-/* viewBox x positions for the band's centre: fully clear of the
-   left edge, and fully clear of the right. The rect is 16 units
-   wide (25% of the lock's 64) and rotated 20 degrees, so it needs
-   to overshoot both ends. */
-const BAND_START = -34;
-const BAND_END = 76;
+import { createLockScene } from './lock3d.js';
 
-const IDLE_INTENSITY = 0.35;
-const IDLE_GAP = 5;
-const BLOOM_MAX = 14;
+/* 0 = light hard left, 1 = hard right. One pass through the
+   viewport is one sweep. */
+const IDLE_AMPLITUDE = 0.175;
+const IDLE_PERIOD = 5;
+const NEUTRAL = 0.5;
 
 const noop = () => {};
-const NULL_CONTROLLER = { sweep: noop, stopIdle: noop, startIdle: noop };
 
-export function initLock({ prefersReducedMotion, gsap } = {}) {
-  const svg = document.querySelector('[data-lock-svg]');
-  const shine = svg && svg.querySelector('[data-shine]');
-  const band = svg && svg.querySelector('[data-shine-band]');
+function hasWebGL() {
+  try {
+    return !!document.createElement('canvas').getContext('webgl');
+  } catch (e) {
+    return false;
+  }
+}
 
-  if (!svg || !shine || !band || prefersReducedMotion || !gsap) {
-    return NULL_CONTROLLER;
+const activeTheme = () =>
+  document.documentElement.dataset.theme === 'light' ? 'light' : 'dark';
+
+export function initLock({ prefersReducedMotion = false, gsap = null } = {}) {
+  const stage = document.querySelector('[data-lock-stage]');
+  if (!stage) return { setState: noop, destroy: noop };
+
+  const svg = stage.querySelector('[data-lock-svg]');
+  const spec = svg && svg.querySelector('[data-lock-spec]');
+  const title = svg && svg.querySelector('[data-lock-title]');
+
+  let state = 'locked';
+  let scene = null;
+
+  /* ── THE SHARED SCALAR ──────────────────────────────────────
+     One value, two consumers: the SVG path writes a custom
+     property and the specular gradient's centre; the WebGL path
+     moves a real light. Nothing else writes either. */
+  let p = prefersReducedMotion ? NEUTRAL : 0;
+
+  function applyLight() {
+    stage.style.setProperty('--p', p.toFixed(4));
+
+    /* Gradient attributes do not resolve var(), so --p reaches the
+       specular through JS. cx and fx move together: moving the
+       focal point alone skews the gradient where we want to
+       translate it. */
+    if (spec) {
+      const x = (0.1 + p * 0.8).toFixed(4);
+      spec.setAttribute('cx', x);
+      spec.setAttribute('fx', x);
+    }
+
+    if (scene) scene.setLight(p);
   }
 
-  const hero = document.querySelector('.hero-band');
-
-  /* The band's x is set as an *attribute*, never as a GSAP
-     transform: GSAP writes SVG transforms to the CSS `transform`
-     property, which replaces the element's transform attribute
-     outright and would drop the 20-degree tilt. */
-  const setBandX = (v) => band.setAttribute('x', String(v));
-  /* Position and brightness are separate channels on purpose: the
-     scrub owns position, the sweep owns brightness, so phase 4's
-     unlock flash can raise brightness without disturbing wherever
-     the scroll has settled the band. */
-  const state = { intensity: 0, bloom: 0 };
-
-  const applyLight = () => {
-    shine.style.opacity = String(state.intensity);
-    svg.style.setProperty('--lock-bloom', String(state.bloom));
-  };
-
-  const positionAt = (progress) =>
-    setBandX(BAND_START + (BAND_END - BAND_START) * progress);
-
-  positionAt(0);
   applyLight();
 
-  /* ── IDLE AMBIENT LOOP ──────────────────────────────────────
-     Cancellable and resumable, so the phase-4 unlock flash can
-     take the stage without fighting a sweep already in flight. */
-  const idle = gsap.timeline({ repeat: -1, repeatDelay: IDLE_GAP, paused: true });
+  /* ── STATE ──────────────────────────────────────────────────
+     Three states, and the site can enter any of them without
+     playing anything. Only a live solve animates. */
+  function paintState(next) {
+    const open = next !== 'locked';
 
-  idle
-    .fromTo(
-      state,
-      { intensity: 0, bloom: 0 },
-      {
-        intensity: IDLE_INTENSITY,
-        bloom: BLOOM_MAX * IDLE_INTENSITY,
-        duration: 0.7,
-        ease: 'sine.in',
-        onUpdate: applyLight,
-      },
-      0,
-    )
-    .to(
-      state,
-      {
-        intensity: 0,
-        bloom: 0,
-        duration: 0.7,
-        ease: 'sine.out',
-        onUpdate: applyLight,
-      },
-      0.7,
-    )
-    .fromTo(
-      band,
-      { attr: { x: BAND_START } },
-      { attr: { x: BAND_END }, duration: 1.4, ease: 'power1.inOut' },
-      0,
-    );
+    if (title) {
+      title.textContent = open ? 'Padlock, unlocked' : 'Padlock, locked';
+    }
+    if (scene) {
+      scene.canvas.setAttribute(
+        'aria-label',
+        open ? 'Padlock, unlocked' : 'Padlock, locked',
+      );
+    }
 
+    /* The SVG unlock is a CSS transition on the shackle group. No
+       pop, no tumbler turn — the sideways swing that makes the 3D
+       version worth having cannot be faked here, and "the lock
+       opened" is all the fallback owes anyone. */
+    stage.style.setProperty('--shackle-rotate', open ? '-38deg' : '0deg');
+    stage.style.setProperty('--shackle-lift', open ? '-14' : '0');
+  }
+
+  function setState(next, { animate = false } = {}) {
+    if (next !== 'locked' && next !== 'unlocked') return;
+    const previous = state;
+    state = next;
+    paintState(next);
+
+    if (!scene) return;
+
+    const tl = scene.timeline;
+    const playable = animate && !prefersReducedMotion && previous !== next;
+
+    if (!playable) {
+      tl.progress(next === 'unlocked' ? 1 : 0).pause();
+      return;
+    }
+
+    if (next === 'unlocked') {
+      tl.timeScale(1).play();
+    } else {
+      /* Mechanisms close faster and harder than they open. Only
+         bypass-off ever gets here; a real solve is never undone. */
+      tl.timeScale(1 / 0.7).reverse();
+    }
+  }
+
+  paintState(state);
+
+  /* ── DRIVERS ────────────────────────────────────────────────
+     Both need GSAP. Without it motion.css runs a CSS-only idle
+     pass on the same registered property, so the fallback of the
+     fallback is still a lit, moving lock. */
   let idleRunning = false;
+  let idleTween = null;
+  const scrubbed = { p: 0 };
 
-  const startIdle = () => {
-    if (idleRunning) return;
+  if (gsap && !prefersReducedMotion) {
+    const ScrollTrigger = window.ScrollTrigger;
+
+    if (ScrollTrigger) {
+      gsap.registerPlugin(ScrollTrigger);
+
+      gsap.to(scrubbed, {
+        p: 1,
+        ease: 'none',
+        scrollTrigger: {
+          trigger: stage,
+          start: 'top bottom',
+          end: 'bottom top',
+          /* Smoothing only. No pin, no sticky: the page scrolls at
+             normal speed throughout. Hijacking scroll to play an
+             animation is the failure mode this design avoids. */
+          scrub: 0.5,
+          onUpdate: (self) => {
+            /* First scroll input hands control to the scrub. It
+               does not come back on scroll-to-top: an ambient loop
+               under a reader's cursor is noise. */
+            if (self.progress > 0.001 && idleRunning) stopIdle();
+          },
+        },
+        onUpdate: () => {
+          if (idleRunning) return;
+          p = scrubbed.p;
+          applyLight();
+        },
+      });
+
+      /* The hero sits at the top of the page, so on load the
+         trigger is already partway through its range and p rests
+         near the middle rather than at 0. Force it to be computed
+         before the idle loop reads it, or the idle oscillates
+         around the wrong centre and visibly jumps the moment the
+         scrub takes over. */
+      ScrollTrigger.refresh();
+    }
+
+    startIdle();
+  }
+
+  function startIdle() {
+    if (idleRunning || !gsap) return;
     idleRunning = true;
-    idle.play(0);
-  };
 
-  const stopIdle = () => {
+    const centre = scrubbed.p;
+    const swing = { t: 0 };
+
+    idleTween = gsap.to(swing, {
+      t: 1,
+      duration: IDLE_PERIOD,
+      ease: 'none',
+      repeat: -1,
+      onUpdate: () => {
+        p = centre + Math.sin(swing.t * Math.PI * 2) * IDLE_AMPLITUDE;
+        applyLight();
+      },
+    });
+  }
+
+  function stopIdle() {
     if (!idleRunning) return;
     idleRunning = false;
-    idle.pause();
+    if (idleTween) idleTween.kill();
+    idleTween = null;
+
+    /* Hand back to the scrub's own value rather than freezing
+       mid-swing, so the takeover has nothing to jump from. */
+    p = scrubbed.p;
+    applyLight();
+  }
+
+  /* ── THE WEBGL UPGRADE ──────────────────────────────────────
+     Everything above is already a working hero. This adds to it,
+     and any failure leaves it exactly as it was. */
+  const THREE = window.THREE;
+
+  if (THREE && gsap && hasWebGL()) {
+    try {
+      scene = createLockScene({
+        THREE,
+        gsap,
+        stage,
+        theme: activeTheme(),
+        prefersReducedMotion,
+      });
+
+      scene.timeline.progress(state === 'unlocked' ? 1 : 0).pause();
+      scene.setLight(p);
+      paintState(state);
+
+      /* Cross-fade only once a frame is actually on the canvas —
+         fading to a blank canvas is the visible pop the shared
+         sizing box exists to avoid. The SVG stays in the DOM (its
+         <defs> are what the section badges draw from) but leaves
+         the accessibility tree, so the lock is announced once. */
+      scene.onReady(() => {
+        /* setAttribute, not dataset.lock3d: the dataset key would
+           serialise to data-lock3d and never match the stylesheet. */
+        stage.setAttribute('data-lock-3d', 'on');
+        if (svg) svg.setAttribute('aria-hidden', 'true');
+      });
+
+      document.addEventListener('theme:change', (event) => {
+        scene.applyTheme(event.detail.theme);
+      });
+    } catch (e) {
+      /* The SVG is already correct and already on screen. */
+      if (scene) scene.destroy();
+      scene = null;
+    }
+  }
+
+  return {
+    setState,
+    getState: () => state,
+    is3D: () => !!scene,
+    destroy: () => {
+      if (scene) scene.destroy();
+      scene = null;
+    },
   };
-
-  /* ── SCROLL SCRUB ───────────────────────────────────────────
-     The band tracks the hero's scroll-out, eased rather than
-     snapped. `scrub: 0.6` is what stops it feeling nailed to the
-     scrollbar. Registering this is conditional on ScrollTrigger
-     actually being present — GSAP core alone is enough for the
-     idle loop, so a half-blocked CDN still degrades gracefully. */
-  const ScrollTrigger = window.ScrollTrigger;
-
-  if (ScrollTrigger && hero) {
-    gsap.registerPlugin(ScrollTrigger);
-
-    const scrubbed = { p: 0 };
-
-    gsap.to(scrubbed, {
-      p: 1,
-      ease: 'none',
-      scrollTrigger: {
-        trigger: hero,
-        start: 'top top',
-        end: 'bottom top',
-        scrub: 0.6,
-        onEnter: stopIdle,
-        onUpdate: (self) => {
-          /* First scroll input hands control over from the idle
-             loop. It does not come back on scroll-to-top: an
-             ambient loop under a reader's cursor is noise. */
-          if (self.progress > 0.001) stopIdle();
-        },
-      },
-      onUpdate: () => {
-        if (idleRunning) return;
-        positionAt(scrubbed.p);
-        /* Brightest with the band mid-lock, dark at both ends. */
-        state.intensity = Math.sin(scrubbed.p * Math.PI) * 0.8;
-        state.bloom = state.intensity * BLOOM_MAX;
-        applyLight();
-      },
-    });
-  }
-
-  startIdle();
-
-  /* ── IMPERATIVE SWEEP ───────────────────────────────────────
-     Phase 4's unlock flash calls this. It suspends the idle loop
-     for its duration and restores whatever was running after. */
-  function sweep({ intensity = 1, duration = 0.7 } = {}) {
-    const wasIdle = idleRunning;
-    stopIdle();
-
-    const tl = gsap.timeline({
-      onComplete: () => {
-        state.intensity = 0;
-        state.bloom = 0;
-        applyLight();
-        if (wasIdle) startIdle();
-      },
-    });
-
-    tl.fromTo(
-      band,
-      { attr: { x: BAND_START } },
-      { attr: { x: BAND_END }, duration, ease: 'power2.inOut' },
-      0,
-    )
-      .fromTo(
-        state,
-        { intensity: 0, bloom: 0 },
-        {
-          intensity,
-          bloom: intensity * BLOOM_MAX,
-          duration: duration / 2,
-          ease: 'sine.in',
-          onUpdate: applyLight,
-        },
-        0,
-      )
-      .to(
-        state,
-        {
-          intensity: 0,
-          bloom: 0,
-          duration: duration / 2,
-          ease: 'sine.out',
-          onUpdate: applyLight,
-        },
-        duration / 2,
-      );
-
-    return tl;
-  }
-
-  return { sweep, stopIdle, startIdle };
 }

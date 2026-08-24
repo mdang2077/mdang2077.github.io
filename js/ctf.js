@@ -19,6 +19,7 @@ export function initCtf() {
       input: el.querySelector('[data-answer]'),
       msg: el.querySelector('[data-msg]'),
       lock: el.querySelector('[data-lock]'),
+      badge: el.querySelector('[data-lock-badge]'),
       reveal: el.querySelector('[data-reveal]'),
     }))
     .filter((s) => s.challenge && s.input && s.reveal);
@@ -63,17 +64,24 @@ export function initCtf() {
       section.challenge.classList.toggle('is-hidden', isOpen);
       section.reveal.classList.toggle('is-visible', isOpen);
 
+      /* State goes on the badge as an attribute rather than as a
+         className on the label: the label is now a sibling of the
+         badge's SVG, and writing className there would style the
+         wrong element while textContent would wipe the drawing. */
       if (section.lock) {
-        if (solved[i]) {
-          section.lock.textContent = '[ unlocked ]';
-          section.lock.className = 'unlock-icon';
-        } else if (bypass) {
-          section.lock.textContent = '[ bypassed ]';
-          section.lock.className = 'lock-icon is-bypassed';
-        } else {
-          section.lock.textContent = '[ locked ]';
-          section.lock.className = 'lock-icon';
-        }
+        section.lock.textContent = solved[i]
+          ? '[ unlocked ]'
+          : bypass
+            ? '[ bypassed ]'
+            : '[ locked ]';
+      }
+
+      if (section.badge) {
+        section.badge.dataset.lockState = solved[i]
+          ? 'unlocked'
+          : bypass
+            ? 'bypassed'
+            : 'locked';
       }
 
       if (dots[i]) dots[i].classList.toggle('is-done', solved[i]);

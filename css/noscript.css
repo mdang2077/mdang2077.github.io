@@ -16,8 +16,7 @@
 .challenge,
 .progress,
 .bypass-row,
-.lock-icon,
-.unlock-icon {
+.lock-badge {
   display: none;
 }
 
@@ -36,9 +35,13 @@
   --accent-l: var(--solved-l);
 }
 
-.hero-lock {
-  --shackle-rotate: -28deg;
-  --shackle-lift: -3px;
+.lock-stage {
+  --shackle-rotate: -38deg;
+  --shackle-lift: -14;
+
+  /* No scrub and no idle loop without JS, so the lock is lit
+     head-on rather than left at whatever --p started on. */
+  --p: 0.5;
 }
 
 .pin-rail,

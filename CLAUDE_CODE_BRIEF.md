@@ -21,7 +21,12 @@ Current structure:
 
 ---
 
-**Visual reference:** `wireframe.svg` in the repo root — a simplified wireframe of the target layout in both themes. It shows proportion and hierarchy only; type, colour, and spacing are all still open.
+**Visual references in the repo root:**
+- `wireframe.svg` — simplified wireframe of the target layout in both themes. Proportion and hierarchy only; type, colour, and spacing are still open.
+- `LOCK_SPEC.md` — **authoritative** spec for the hero padlock: form, size, material, the `--p` scroll-lighting model, and the unlock animation. Where it conflicts with §5 below, LOCK_SPEC.md wins.
+- `lock-combined-prototype.html` — **start here.** All three systems working together (chrome material, scroll light sweep, unlock) in both themes, verified rendering.
+- `lock-unlock-prototype.html` — the original Three.js unlock prototype.
+- `lock-light-prototype.html` — working prototype of the **scroll-driven lighting model**, and the required no-WebGL fallback path.
 
 ---
 
@@ -137,7 +142,7 @@ Audit and fix, at minimum:
 - **Contacts and identity are never gated.** GitHub, LinkedIn, resume, and `user_info.txt` render for a visitor who solves nothing, bypasses nothing, and has JS disabled.
 - **Progressive enhancement.** With JS off or a CDN blocked, the page must still render legibly and all content must be reachable — the bypass path should be the default no-JS state, not a locked wall.
 - **Portrait asset.** `IMG_8288.JPG` is 720KB for a ~300px display width. Re-encode to WebP at 2× display size with a JPEG fallback, add explicit `width`/`height`, `loading="eager"`, `decoding="async"`. Target <80KB.
-- **Budget.** Total transfer under 400KB on first load. Report GSAP's actual cost (core + only the plugins used) in the plan. Load plugins individually — do not pull the whole bundle.
+- **Budget.** Total transfer under 400KB on first load. Report GSAP's actual cost (core + only the plugins used) in the plan. Load plugins individually — do not pull the whole bundle. **This budget conflicts with the Three.js hero lock** (`LOCK_SPEC.md` §0) — Three alone is ~150KB gzipped. Surface the conflict in the plan and propose a resolution (raise the budget, or lazy-load Three behind the SVG fallback); do not silently exceed it.
 - **Accessibility.** WCAG AA contrast in *both* themes for every token pair — verify the green `#00ff88` and red `#ff3333` accents on the paper-terminal ground specifically; they will likely need adjustment. Full keyboard operability. `aria-live` on challenge feedback.
 - **Preserve all existing content verbatim:** three challenges and their answers (`security is cool`, `17`, `png`), all skill tags, all three project cards with descriptions and links, the EQTY Lab internship link, the ID card fields, the footer.
 
