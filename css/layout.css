@@ -96,7 +96,13 @@
     box-shadow: none;
   }
 
+  /* `.layout` is `align-items: flex-start`, so in column
+     direction the children size to max-content on the cross axis
+     rather than filling. Without this the main column takes its
+     widest child's intrinsic width and overflows narrow phones —
+     body's overflow-x: hidden was quietly clipping it. */
   .main {
+    width: 100%;
     padding: var(--space-7) var(--space-5);
   }
 

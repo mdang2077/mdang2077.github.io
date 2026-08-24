@@ -32,6 +32,12 @@
 <link rel="stylesheet" href="css/components.css">
 <link rel="stylesheet" href="css/motion.css">
 <noscript><link rel="stylesheet" href="css/noscript.css"></noscript>
+<!-- GSAP core + ScrollTrigger. Loaded individually, not as the
+     bundle, and deferred so they execute before js/main.js in the
+     same defer queue. Every consumer treats them as optional: if
+     the CDN is blocked, the page falls back to CSS-only motion. -->
+<script defer src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/gsap.min.js" integrity="sha384-HOvlOYPIs/zjoIkWUGXkVmXsjr8GuZLV+Q+rcPwmJOVZVpvTSXQChiN4t9Euv9Vc" crossorigin="anonymous"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/ScrollTrigger.min.js" integrity="sha384-P8VzCVnT9NBUkMrpcIZrJbA7EBjJvh/fJS6PmP+4nLIM284DtsImIv8D0fFjIkeh" crossorigin="anonymous"></script>
 <script type="module" src="js/main.js"></script>
 </head>
 <body>
@@ -44,6 +50,84 @@
   </div>
 </header>
 
+<!-- ══════════════════════════════════════════════════════════════
+     HERO BAND — the name lockup. Spans both columns; the sidebar's
+     old <h1> is gone so the name is not duplicated.
+     ══════════════════════════════════════════════════════════════ -->
+<section class="hero-band">
+
+  <h1 class="lockup">
+    <span class="lockup-word">MARTIN</span>
+
+    <!-- Hand-authored padlock, ~2KB. Shackle and body are separate
+         <g> elements so they animate independently. Every shape is
+         defined once with an id and re-used by the shine mask, so
+         the mask follows the shackle when it opens.
+         Hinge pin: viewBox (46, 48) — base of the right leg, where
+         it enters the body. Phase 4 rotates about that point; it is
+         also written into .lock-shackle-group in components.css. -->
+    <svg class="hero-lock" viewBox="0 0 64 92" role="img" aria-label="padlock" data-lock-svg>
+      <defs>
+        <!-- Bevel: lighter at the top edge, falling to the accent. -->
+        <linearGradient id="lock-bevel" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0"   stop-color="currentColor" stop-opacity="0.62"/>
+          <stop offset="0.45" stop-color="currentColor" stop-opacity="0.38"/>
+          <stop offset="1"   stop-color="currentColor" stop-opacity="0.55"/>
+        </linearGradient>
+
+        <!-- The specular band: transparent -> white -> transparent,
+             ~25% of the lock's width, angled 20 degrees off vertical. -->
+        <linearGradient id="lock-shine-band" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0"    stop-color="#ffffff" stop-opacity="0"/>
+          <stop offset="0.35" stop-color="#ffffff" stop-opacity="0.55"/>
+          <stop offset="0.5"  stop-color="#ffffff" stop-opacity="1"/>
+          <stop offset="0.65" stop-color="#ffffff" stop-opacity="0.55"/>
+          <stop offset="1"    stop-color="#ffffff" stop-opacity="0"/>
+        </linearGradient>
+
+        <path id="lock-shackle-path" d="M18 48 V34 a14 14 0 0 1 28 0 V48"/>
+        <rect id="lock-body-path" x="6" y="44" width="52" height="44" rx="7"/>
+
+        <!-- Mask built from <use> of the live shapes, so it tracks
+             the shackle's transform instead of drifting from it. -->
+        <mask id="lock-mask">
+          <use href="#lock-body-path" fill="#ffffff"/>
+          <g class="lock-shackle-group">
+            <use href="#lock-shackle-path" fill="none" stroke="#ffffff" stroke-width="8" stroke-linecap="round"/>
+          </g>
+        </mask>
+      </defs>
+
+      <g class="lock-shackle-group">
+        <use class="lock-shackle" href="#lock-shackle-path"/>
+      </g>
+
+      <g class="lock-body-group">
+        <use class="lock-body-fill" href="#lock-body-path"/>
+        <use class="lock-body-stroke" href="#lock-body-path"/>
+        <path class="lock-keyhole" d="M32 56a5 5 0 0 0-2.2 9.5L28 76h8l-1.8-10.5A5 5 0 0 0 32 56z"/>
+      </g>
+
+      <g class="lock-shine" mask="url(#lock-mask)" data-shine>
+        <rect data-shine-band x="-24" y="-40" width="16" height="180"
+              fill="url(#lock-shine-band)" transform="rotate(20 32 46)"/>
+      </g>
+    </svg>
+
+    <span class="lockup-word lockup-word--accent">DANG</span>
+  </h1>
+
+  <!-- Pin rail: one pin per section. Rendered empty in phase 3;
+       phase 4 seats them (solve) or shims them (bypass). Purely a
+       visual echo of the progress label, hence aria-hidden. -->
+  <div class="pin-rail" data-pin-rail aria-hidden="true">
+    <span class="pin" data-pin="0" data-pin-state="empty"></span>
+    <span class="pin" data-pin="1" data-pin-state="empty"></span>
+    <span class="pin" data-pin="2" data-pin-state="empty"></span>
+  </div>
+
+</section>
+
 <div class="layout">
 
   <aside class="sidebar">
@@ -55,7 +139,6 @@
 
     <div class="hero">
       <p class="hero-tag">// CybSec Enthusiast</p>
-      <h1 class="hero-name">Martin <span class="hero-name-accent">Dang</span></h1>
       <p class="hero-blurb">Learning as much as I can everyday; one step forward is still a step forward.</p>
     </div>
 
@@ -97,11 +180,21 @@
       </div>
     </div>
 
-    <div class="progress" role="status">
-      <span class="progress-dot" data-dot aria-hidden="true"></span>
-      <span class="progress-dot" data-dot aria-hidden="true"></span>
-      <span class="progress-dot" data-dot aria-hidden="true"></span>
-      <span class="progress-label" data-progress-label>0 / 3 unlocked</span>
+    <div class="status-strip">
+      <div class="progress" role="status">
+        <span class="progress-dot" data-dot aria-hidden="true"></span>
+        <span class="progress-dot" data-dot aria-hidden="true"></span>
+        <span class="progress-dot" data-dot aria-hidden="true"></span>
+        <span class="progress-label" data-progress-label>0 / 3 unlocked</span>
+      </div>
+
+      <!-- Run console. aria-hidden because it only echoes things
+           already announced: each challenge's "// access granted"
+           (aria-live) and the "n / 3 unlocked" label (role=status).
+           A third live region would announce one solve three times. -->
+      <div class="run-log" data-run-log aria-hidden="true">
+        <p class="run-log-line run-log-line--idle" data-run-log-idle>&gt; awaiting input<span class="run-log-cursor">█</span></p>
+      </div>
     </div>
 
     <!-- SECTION 1: SKILLS -->

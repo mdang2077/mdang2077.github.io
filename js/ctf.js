@@ -34,7 +34,29 @@ export function initCtf() {
 
   const solvedCount = () => solved.filter(Boolean).length;
 
-  function render() {
+  /* The single outbound edge of this module. Everything that
+     wants to react to unlock state — the hero pin rail, the run
+     console, phase 4's timelines — listens for this instead of
+     reading ctf.js's internals.
+
+     `reason: 'init'` must apply state without animating: it is
+     what stops the whole choreography firing on page load. */
+  function announce(reason, index) {
+    document.dispatchEvent(
+      new CustomEvent('ctf:state', {
+        detail: {
+          solved: solved.slice(),
+          count: solvedCount(),
+          total: sections.length,
+          bypass,
+          reason,
+          index: index === undefined ? null : index,
+        },
+      }),
+    );
+  }
+
+  function render(reason = 'init', index = null) {
     sections.forEach((section, i) => {
       const isOpen = solved[i] || bypass;
 
@@ -72,6 +94,8 @@ export function initCtf() {
        theme attribute (phase 2) instead of overriding it. */
     document.documentElement.dataset.solved =
       bypass || count === sections.length ? 'true' : 'false';
+
+    announce(reason, index);
   }
 
   function submit(section, index) {
@@ -83,7 +107,7 @@ export function initCtf() {
         section.msg.textContent = '// access granted';
         section.msg.className = 'challenge-msg is-ok';
       }
-      render();
+      render('solve', index);
       return;
     }
 
@@ -110,9 +134,9 @@ export function initCtf() {
   if (bypassBtn) {
     bypassBtn.addEventListener('click', () => {
       bypass = !bypass;
-      render();
+      render(bypass ? 'bypass-on' : 'bypass-off');
     });
   }
 
-  render();
+  render('init');
 }

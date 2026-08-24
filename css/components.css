@@ -102,25 +102,220 @@
   transition: var(--transition-accent);
 }
 
-.hero-name {
-  font-family: var(--font-display);
-  font-size: var(--display-xl);
-  font-weight: var(--weight-normal);
-  letter-spacing: var(--tracking-lg);
-  margin-bottom: 10px;
-  line-height: var(--leading-tight);
-}
-
-.hero-name-accent {
-  color: var(--accent);
-  text-shadow: 0 0 20px var(--text-glow);
-  transition: var(--transition-accent);
-}
-
 .hero-blurb {
   color: var(--text-muted);
   font-size: var(--text-sm);
   line-height: var(--leading-loose);
+}
+
+/* ══════════════════════════════════════════════════════════════
+   HERO BAND — MARTIN [lock] DANG
+
+   A full-width band between the topbar and the two-column shell,
+   so the name spans both columns rather than living inside the
+   376px sidebar. The sidebar's old <h1> is gone; this is the
+   document's only h1.
+   ══════════════════════════════════════════════════════════════ */
+.hero-band {
+  position: relative;
+  z-index: var(--z-content);
+  padding: var(--space-9) var(--space-7) var(--space-8);
+  border-bottom: var(--border-hair) solid var(--border);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-4);
+  overflow: hidden;
+}
+
+.lockup {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(var(--space-3), 2.5vw, var(--space-6));
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: var(--weight-normal);
+  font-size: clamp(var(--display-md), 9vw, 92px);
+  line-height: var(--leading-tight);
+  letter-spacing: var(--tracking-xl);
+}
+
+.lockup-word {
+  color: var(--text);
+}
+
+.lockup-word--accent {
+  color: var(--accent);
+  text-shadow: 0 0 24px var(--text-glow);
+  transition: var(--transition-accent);
+}
+
+/* ── THE LOCK ────────────────────────────────────────────────
+   Optically aligned to cap-height rather than sitting on the
+   baseline: VT323's caps run to roughly 0.72em, so the glyph is
+   sized to that and nudged down by the difference between the
+   font's centre and the cap-band's centre. */
+.hero-lock {
+  --shackle-rotate: 0deg;
+  --shackle-lift: 0px;
+
+  width: auto;
+  height: 0.98em;
+  flex: none;
+  overflow: visible;
+  color: var(--accent);
+  transform: translateY(0.055em);
+  filter: drop-shadow(0 0 calc(var(--lock-bloom) * 1px) var(--glow-lg));
+  transition: color var(--dur-accent) var(--ease-standard);
+}
+
+/* Machined-metal read: a two-stop bevel plus a hairline inner
+   stroke, both driven by currentColor so the lock re-themes and
+   re-accents for free. */
+.lock-body-fill   { fill: url(#lock-bevel); }
+.lock-body-stroke { fill: none; stroke: currentColor; stroke-width: 1.5; opacity: 0.9; }
+.lock-keyhole     { fill: var(--bg); }
+.lock-shackle     { fill: none; stroke: currentColor; stroke-width: 8; stroke-linecap: round; }
+
+/* The hinge pin — base of the shackle's right leg, viewBox
+   coordinates. Phase 4 rotates about exactly this point; it is
+   written here and in the SVG so it never has to be re-derived.
+   `view-box` keeps the origin in viewBox units rather than
+   bounding-box units, which is what makes the number readable. */
+.lock-shackle-group {
+  transform-box: view-box;
+  transform-origin: 46px 48px;
+  transform: rotate(var(--shackle-rotate)) translateY(var(--shackle-lift));
+  transition:
+    transform var(--dur-slow) var(--ease-out);
+}
+
+/* The specular band. It is masked by the lock's own geometry, so
+   light never spills onto the background — this is a real mask
+   sweep, not a background-position shimmer. */
+.lock-shine {
+  opacity: var(--shine-intensity);
+  mix-blend-mode: screen;
+  pointer-events: none;
+}
+
+/* ── PIN RAIL ────────────────────────────────────────────────
+   Three pins, one per section. Phase 3 renders them all `empty`
+   and ships the other two states unused; phase 4 seats them.
+   `shim` reuses the amber that `[ bypassed ]` already uses, so
+   "opened, but not earned" reads the same everywhere. */
+.pin-rail {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.pin {
+  width: 10px;
+  height: 10px;
+  border-radius: var(--radius-full);
+  border: var(--border-thick) solid var(--text-muted);
+  background: transparent;
+  transition:
+    border-color var(--dur-slow) var(--ease-standard),
+    background   var(--dur-slow) var(--ease-standard),
+    box-shadow   var(--dur-slow) var(--ease-standard);
+}
+
+.pin[data-pin-state="seated"] {
+  border-color: var(--accent);
+  background: var(--accent);
+  box-shadow: 0 0 var(--space-2) var(--glow-lg);
+}
+
+.pin[data-pin-state="shim"] {
+  border-style: dashed;
+  border-color: var(--amber);
+  background: transparent;
+  box-shadow: 0 0 var(--space-2) var(--amber-glow);
+}
+
+/* ── STATUS STRIP — progress dots + run console ────────────── */
+.status-strip {
+  margin-bottom: var(--space-8);
+}
+
+.status-strip .progress {
+  margin-bottom: var(--space-3);
+}
+
+/* Height is reserved for four lines and never changes: three
+   solve lines, or two solves plus the bypass line. Growing the
+   block would push every section down, which the zero-layout-
+   shift rule forbids. */
+.run-log {
+  --run-log-lines: 4;
+
+  border: var(--border-hair) solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-inset);
+  padding: var(--space-3) var(--space-4);
+  font-size: var(--text-2xs);
+  line-height: var(--leading-snug);
+  color: var(--text-muted);
+  min-height: calc(
+    var(--run-log-lines) * var(--text-2xs) * var(--leading-snug)
+    + 2 * var(--space-3)
+  );
+  overflow: hidden;
+  transition: border-color var(--dur-accent) var(--ease-standard);
+}
+
+ /* `pre` sits on the line, not the block: on the block it would
+    also preserve the indentation whitespace between the markup's
+    child elements, which adds phantom line boxes to a container
+    whose height is reserved to the pixel. */
+.run-log-line {
+  margin: 0;
+  white-space: pre;
+}
+
+/* At rest the block reads as an idle console rather than dead
+   air. The prompt is removed once the first line prints. */
+ /* --text-muted, not --text-dim: dim measures 3.43:1 on the
+    inset fill in dark and 2.83:1 in light, and both of these are
+    real text. Hierarchy comes from the brighter accent and --text
+    columns beside them instead. */
+.run-log-line--idle {
+  color: var(--text-muted);
+}
+
+.run-log-mark        { color: var(--accent); }
+.run-log-line--warn .run-log-mark,
+.run-log-line--warn  { color: var(--amber); }
+.run-log-name        { color: var(--text); }
+.run-log-count       { color: var(--text-muted); }
+
+ /* A block *glyph*, not an inline-block box. A box with a
+    vertical-align changes the line box's height, and the run
+    log's height is reserved to the pixel — the cursor is not
+    allowed to be the thing that moves it. */
+.run-log-cursor {
+  animation: blink-dot 1.2s var(--ease-in-out) infinite;
+}
+
+/* ── HERO BAND RESPONSIVE ───────────────────────────────────
+   The lockup is the one thing on the page allowed to dominate a
+   phone screen; the pins stay under it and shrink with it. */
+@media (max-width: 768px) {
+  .hero-band {
+    padding: var(--space-7) var(--space-5) var(--space-6);
+  }
+
+  .lockup {
+    letter-spacing: var(--tracking-lg);
+  }
+
+  .pin {
+    width: 8px;
+    height: 8px;
+  }
 }
 
 /* ── ID CARD ─────────────────────────────────────────────── */

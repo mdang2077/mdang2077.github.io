@@ -31,6 +31,38 @@
   animation: unlock-flash var(--dur-flash) var(--ease-out);
 }
 
+/* ── LOCK SHINE — CSS FALLBACK ───────────────────────────────
+   The real sweep is scroll-linked and lives in js/lock.js. This
+   is what runs when GSAP never arrives (CDN blocked, offline):
+   a slow ambient sweep only, no scroll link. main.js stamps
+   data-gsap="on" as soon as the library is confirmed, so this
+   rule is inert on the normal path.
+
+   The keyframe restates the 20deg rotation because a CSS
+   transform on an SVG element replaces the transform attribute
+   outright rather than composing with it. */
+@keyframes lock-shine-sweep {
+  0%       { transform: rotate(20deg) translateX(-70px); }
+  100%     { transform: rotate(20deg) translateX(70px); }
+}
+
+@keyframes lock-shine-fade {
+  0%, 100% { opacity: 0; }
+  15%, 85% { opacity: 0.35; }
+}
+
+:root:not([data-gsap="on"]) .lock-shine {
+  animation: lock-shine-fade var(--dur-shine) var(--ease-in-out)
+             var(--idle-shine-gap) infinite;
+}
+
+:root:not([data-gsap="on"]) [data-shine-band] {
+  transform-box: view-box;
+  transform-origin: 32px 46px;
+  animation: lock-shine-sweep var(--dur-shine) var(--ease-in-out)
+             var(--idle-shine-gap) infinite;
+}
+
 /* ── THEME SWAP ──────────────────────────────────────────────
    The crossfade exists only while a swap is in flight: theme.js
    adds the class, flips the attribute, then drops the class. No
@@ -99,8 +131,22 @@
   .id-dot,
   .progress-dot,
   .reveal.is-visible,
-  .challenge-input.is-wrong {
+  .challenge-input.is-wrong,
+  .run-log-cursor,
+  .lock-shine,
+  [data-shine-band] {
     animation: none !important;
+  }
+
+  /* No ambient sweep, no bloom. js/lock.js checks the same query
+     once and never registers the scrub or the idle loop, so this
+     only has to cover the CSS fallback path. */
+  .lock-shine {
+    opacity: 0;
+  }
+
+  .hero-lock {
+    filter: none;
   }
 
   /* Beats the theme-swap rule's own !important. theme.js also

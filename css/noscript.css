@@ -20,3 +20,28 @@
 .unlock-icon {
   display: none;
 }
+
+/* ── PHASE 3: THE HERO LOCK IN THE NO-JS STATE ───────────────
+   No-JS is the bypassed state, so the hero has to agree with the
+   rest of the page: the lock reads open and the accent is the
+   solved hue. `data-solved` is set by ctf.js, which is exactly
+   what is not running here, so the channels are remapped
+   directly instead.
+
+   The pin rail and the run console are puzzle machinery with no
+   state to show, so they go with the challenges. */
+:root {
+  --accent-h: var(--solved-h);
+  --accent-s: var(--solved-s);
+  --accent-l: var(--solved-l);
+}
+
+.hero-lock {
+  --shackle-rotate: -28deg;
+  --shackle-lift: -3px;
+}
+
+.pin-rail,
+.status-strip {
+  display: none;
+}

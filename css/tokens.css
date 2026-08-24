@@ -77,6 +77,14 @@
   --dur-reveal:  450ms;   /* view-transition circular reveal */
   --dur-flash:   800ms;   /* unlock flash */
 
+  /* Phase 3/4 — the unlock system. GSAP-side eases (back.out,
+     power2.in) stay in JS: they have no CSS equivalent. */
+  --dur-flight:  520ms;   /* [ unlocked ] glyph -> hero pin */
+  --dur-seat:    180ms;   /* pin seating pop */
+  --dur-type:     28ms;   /* per character, run console */
+  --dur-shine:  1400ms;   /* one specular sweep across the lock */
+  --idle-shine-gap: 5s;   /* ambient sweep interval at rest */
+
   --ease-standard: ease;
   --ease-out:      cubic-bezier(0.22, 1, 0.36, 1);
   --ease-in-out:   cubic-bezier(0.65, 0, 0.35, 1);
@@ -265,7 +273,28 @@
   --z-scanline: 1;
   --z-content:  2;
   --z-header:   100;
+  --z-flight:   90;   /* deliberately below the topbar: the phase-4
+                         flight clone passes *under* the sticky bar */
 }
+
+/* ══════════════════════════════════════════════════════════════
+   REGISTERED PROPERTIES
+
+   Unregistered custom properties do not interpolate — they snap.
+   The accent channels have to animate (the locked -> solved hue
+   rotation in phase 4), so they are registered here. The initial
+   values are the dark locked accent; nothing reads them, because
+   :root assigns all three unconditionally.
+   ══════════════════════════════════════════════════════════════ */
+@property --accent-h { syntax: '<number>';     inherits: true; initial-value: 0; }
+@property --accent-s { syntax: '<percentage>'; inherits: true; initial-value: 100%; }
+@property --accent-l { syntax: '<percentage>'; inherits: true; initial-value: 60%; }
+
+/* Sweep intensity and bloom radius, driven from js/lock.js. Both
+   are registered so a CSS transition on them is possible without
+   JS, and so an invalid value cannot poison the whole filter. */
+@property --shine-intensity { syntax: '<number>'; inherits: false; initial-value: 0; }
+@property --lock-bloom      { syntax: '<number>'; inherits: false; initial-value: 0; }
 
 /* ══════════════════════════════════════════════════════════════
    THEME ACTIVATION
