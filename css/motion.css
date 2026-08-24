@@ -1,0 +1,55 @@
+/* ============================================================
+   MOTION — keyframes and the global reduced-motion guard.
+   Everything here animates transform / opacity / filter /
+   box-shadow only. Nothing animates height, top, width or
+   margin, so no animation can shift layout.
+   ============================================================ */
+
+@keyframes blink-dot {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.3; }
+}
+
+@keyframes dot-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 var(--pulse-ring-1); }
+  50%      { box-shadow: 0 0 0 var(--border-marker) var(--pulse-ring-2); }
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25%      { transform: translateX(-4px); }
+  75%      { transform: translateX(4px); }
+}
+
+@keyframes unlock-flash {
+  0%   { box-shadow: 0 0 0 0 var(--glow-lg); }
+  30%  { box-shadow: 0 0 30px var(--space-2) var(--glow-lg); }
+  100% { box-shadow: none; }
+}
+
+.reveal.is-visible {
+  animation: unlock-flash var(--dur-flash) var(--ease-out);
+}
+
+/* ── REDUCED MOTION ──────────────────────────────────────────
+   One global guard. Content stays instant, complete and fully
+   usable — no decorative loop, no flash, no scrubbed effect.
+   JS checks the same query once (see js/main.js) so scripted
+   timelines respect it too. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .id-dot,
+  .progress-dot,
+  .reveal.is-visible,
+  .challenge-input.is-wrong {
+    animation: none !important;
+  }
+}

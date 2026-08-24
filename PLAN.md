@@ -30,6 +30,7 @@ css/
   layout.css          header, two-column shell, responsive
   components.css      cards, tags, buttons, inputs, progress, locks, socials, footer
   motion.css          keyframes + prefers-reduced-motion overrides
+  noscript.css        loaded only from <noscript>: the bypassed no-JS state
 js/
   main.js             entry point, imports the rest
   ctf.js              challenge logic, unlock state, progress, bypass
@@ -81,6 +82,38 @@ both palettes get tuned together: `#6b8a7c` measures 4.99:1 on `--surface-1`.
 Confirms the brief's suspicion: the dark accents cannot cross over. `#ff3333`
 on paper is 3.22:1 and `#00ff88` is 1.19:1 — both unusable. Each theme needs
 its own red and green.
+
+## Phase 1 notes
+
+**Verification.** v2 and v3 were rendered headless at 1440x2400 and their
+computed geometry and styles diffed element by element. Every probed element —
+topbar, logo, sidebar, photo, hero name, ID card, contacts, explainer, bypass
+button, progress, challenge box, input, submit button — came back IDENTICAL in
+position, size, colour, shadow, spacing and type, with two exceptions:
+
+1. `.challenge-msg` now reserves its line (`min-height: 1lh`), making each
+   challenge box 19px taller and the page 56px longer. Deliberate: it stops the
+   form shifting when feedback appears, per the zero-layout-shift rule.
+2. Display text gained `'JetBrains Mono'` as an intermediate fallback before
+   `monospace`. No effect while VT323 loads; better if it does not.
+
+A 37-assertion functional suite covers solve, wrong answer, bypass on/off,
+accent state, and markup hygiene. All pass. The no-JS render was verified with
+JavaScript blocked at the profile level: all content revealed, all puzzle
+machinery hidden, contacts and identity intact.
+
+**Payload.** 123KB of own assets on first load, against the 400KB budget —
+leaving roughly 190KB of headroom for GSAP core + ScrollTrigger in phases 3-4.
+
+**Removed as dead code.** `.ctf-stats`, `.stat-card`, `.stat-label`,
+`.stat-val`, `.stat-val.placeholder` — fully styled in v2, never used by any
+markup. Also `.tag.accent`, whose declarations were identical to `.tag`, so
+dropping the modifier changes nothing visually.
+
+**Gating mechanism.** Three layers, so no engine gets a broken page:
+`@media (scripting: enabled)` hides reveals before first paint (no flash);
+`:root[data-js="on"]` covers engines without that media feature; `<noscript>`
+loads `noscript.css`, which is what actually guarantees the no-JS bypass state.
 
 ## Decisions carried from the brief (do not re-litigate)
 

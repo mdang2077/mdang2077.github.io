@@ -1,0 +1,22 @@
+/* ============================================================
+   NO-SCRIPT — loaded only from <noscript> in index.html.
+
+   The no-JS experience is the *bypassed* state: every section's
+   content is revealed and the puzzle machinery is removed, so a
+   visitor with JS off still reaches all content. <noscript> is
+   used rather than `@media (scripting: none)` alone because it
+   is honoured by every engine; the media query in components.css
+   handles the no-flash case for engines that support it.
+   ============================================================ */
+
+:root .reveal {
+  display: block;
+}
+
+.challenge,
+.progress,
+.bypass-row,
+.lock-icon,
+.unlock-icon {
+  display: none;
+}

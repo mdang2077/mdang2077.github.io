@@ -1,0 +1,173 @@
+/* ============================================================
+   TOKENS — the only file in the codebase allowed to hold a
+   colour literal, a raw pixel value, or a timing constant.
+   ============================================================ */
+
+:root {
+  /* ── SPACING — 4px base ────────────────────────────────── */
+  --space-1:  4px;
+  --space-2:  8px;
+  --space-3:  12px;
+  --space-4:  16px;
+  --space-5:  20px;
+  --space-6:  24px;
+  --space-7:  32px;
+  --space-8:  40px;
+  --space-9:  48px;
+  --space-10: 56px;
+  --space-11: 72px;
+
+  /* ── TYPE SCALE ────────────────────────────────────────── */
+  /* mono (JetBrains Mono) */
+  --text-3xs:  9px;
+  --text-2xs:  10px;
+  --text-xs:   11px;
+  --text-sm:   12px;
+  --text-base: 13px;
+  --text-md:   14px;
+  --text-lg:   16px;   /* intermediate step, reserved for phase 3 */
+  --text-xl:   18px;   /* intermediate step, reserved for phase 3 */
+  /* display (VT323) */
+  --display-sm: 22px;
+  --display-md: 28px;
+  --display-lg: 36px;  /* intermediate step, reserved for phase 3 */
+  --display-xl: 44px;
+
+  --leading-tight:  1.1;
+  --leading-snug:   1.5;
+  --leading-normal: 1.7;
+  --leading-loose:  1.8;
+  --leading-relaxed: 1.9;
+
+  --tracking-none:  0;
+  --tracking-sm:    0.5px;
+  --tracking-md:    1px;
+  --tracking-lg:    2px;
+  --tracking-xl:    3px;
+  --tracking-2xl:   4px;
+
+  --font-mono:    'JetBrains Mono', 'Courier New', monospace;
+  --font-display: 'VT323', 'JetBrains Mono', monospace;
+
+  --weight-normal: 400;
+  --weight-semi:   600;
+  --weight-bold:   700;
+
+  /* ── RADII ─────────────────────────────────────────────── */
+  --radius-xs:   3px;
+  --radius-sm:   4px;
+  --radius-md:   8px;
+  --radius-lg:   13px;
+  --radius-xl:   14px;
+  --radius-2xl:  24px;
+  --radius-full: 50%;
+
+  /* ── BORDER WIDTHS ─────────────────────────────────────── */
+  --border-hair:   1px;
+  --border-thick:  2px;
+  --border-marker: 3px;
+
+  /* ── MOTION ────────────────────────────────────────────── */
+  --dur-instant: 100ms;
+  --dur-fast:    200ms;
+  --dur-mid:     300ms;
+  --dur-slow:    400ms;
+  --dur-accent:  500ms;   /* locked -> solved accent crossfade */
+  --dur-flash:   800ms;   /* unlock flash */
+
+  --ease-standard: ease;
+  --ease-out:      cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in-out:   cubic-bezier(0.65, 0, 0.35, 1);
+
+  /* Composite transitions, applied per-component as
+     `transition: var(--transition-accent)` so the rule lives with
+     the component instead of in one global selector list. */
+  --transition-accent:
+      color            var(--dur-accent) var(--ease-standard),
+      border-color     var(--dur-accent) var(--ease-standard),
+      background-color var(--dur-accent) var(--ease-standard),
+      box-shadow       var(--dur-accent) var(--ease-standard),
+      text-shadow      var(--dur-accent) var(--ease-standard);
+
+  --transition-hover:
+      color        var(--dur-fast) var(--ease-standard),
+      border-color var(--dur-fast) var(--ease-standard),
+      background   var(--dur-fast) var(--ease-standard),
+      box-shadow   var(--dur-fast) var(--ease-standard);
+
+  /* ── SURFACES (dark theme) ─────────────────────────────── */
+  --bg:           #080c0a;
+  --surface-1:    #0e1210;
+  --surface-2:    #131a16;
+  --surface-3:    #1a2420;
+  --surface-sunk: rgba(14, 18, 16, 0.6);   /* id-card body */
+  --bg-glass:     rgba(8, 12, 10, 0.85);   /* sticky header */
+
+  --border:        #1e2e28;
+  --border-strong: #2a3d35;
+
+  --text:       #d4e8dc;
+  --text-muted: #4a6358;
+  --text-dim:   #666666;   /* bypassed lock badge */
+
+  /* ── ACCENT ────────────────────────────────────────────────
+     Expressed as HSL channels so every glow derives from the hue
+     rather than being hand-written. `data-solved` on <html> flips
+     the hue; it is an attribute, not an inline style, so it
+     composes with `data-theme` (phase 2) instead of overriding it. */
+  --accent-h: 0;
+  --accent-s: 100%;
+  --accent-l: 60%;         /* hsl(0 100% 60%) === #ff3333 */
+
+  --accent: hsl(var(--accent-h) var(--accent-s) var(--accent-l));
+
+  --glow-lg: hsl(var(--accent-h) var(--accent-s) var(--accent-l) / 0.15);
+  --glow-md: hsl(var(--accent-h) var(--accent-s) var(--accent-l) / 0.08);
+  --glow-sm: hsl(var(--accent-h) var(--accent-s) var(--accent-l) / 0.04);
+
+  /* ── FIXED SIGNAL COLOURS (independent of accent state) ── */
+  --success: #00ff88;
+  --danger:  #ff4444;
+  --warn:    #ffcc00;
+  --amber:   #e6a817;
+  --amber-wash:  rgba(230, 168, 23, 0.12);
+  --amber-glow:  rgba(230, 168, 23, 0.2);
+  --danger-wash: rgba(255, 68, 68, 0.1);
+
+  /* ── OVERLAY / TEXTURE ─────────────────────────────────── */
+  --scanline:      rgba(0, 0, 0, 0.08);
+  --grain-opacity: 0.035;
+  --pulse-ring-1:  rgba(255, 255, 255, 0.05);
+  --pulse-ring-2:  rgba(255, 255, 255, 0.04);
+
+  /* ── ELEVATION / GLOW LEVELS ───────────────────────────── */
+  --elev-photo:
+      0 0 0 var(--border-hair) var(--border),
+      0 0 20px var(--glow-md),
+      0 0 40px var(--glow-md);
+  --elev-card:
+      0 0 0 var(--border-hair) var(--glow-md),
+      0 0 24px var(--glow-md),
+      inset 0 0 30px var(--glow-md);
+  --elev-id-card:
+      0 0 16px var(--glow-md),
+      inset 0 0 20px var(--glow-md);
+
+  /* ── LAYOUT ────────────────────────────────────────────── */
+  --sidebar-width: 376px;
+  --breakpoint-md: 768px;
+
+  /* ── Z-INDEX ───────────────────────────────────────────── */
+  --z-grain:   0;
+  --z-scanline: 1;
+  --z-content: 2;
+  --z-header:  100;
+}
+
+/* Solved / bypassed: the accent hue rotates red -> green.
+   hsl(152 100% 50%) === #00ff88, matching the v2 value exactly. */
+:root[data-solved="true"] {
+  --accent-h: 152;
+  --accent-s: 100%;
+  --accent-l: 50%;
+}

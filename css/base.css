@@ -1,0 +1,100 @@
+/* ============================================================
+   BASE — reset, document typography, texture layers, focus.
+   ============================================================ */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: var(--text-base);
+  line-height: var(--leading-normal);
+  min-height: 100vh;
+  position: relative;
+  overflow-x: hidden;
+}
+
+/* ── NOISE GRAIN OVERLAY ─────────────────────────────────── */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-grain);
+  pointer-events: none;
+  opacity: var(--grain-opacity);
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+  background-size: 200px 200px;
+}
+
+/* ── CRT SCANLINES ───────────────────────────────────────── */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-scanline);
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    var(--scanline) 2px,
+    var(--scanline) 4px
+  );
+}
+
+/* ── TYPOGRAPHY DEFAULTS ─────────────────────────────────── */
+/* Headings carry no intrinsic size, weight or leading — every heading
+   component states its own, so promoting a <div> to an <h2> cannot
+   change how it renders. */
+h1, h2, h3 {
+  font-size: inherit;
+  font-weight: inherit;
+}
+
+a {
+  color: var(--accent);
+  text-decoration: none;
+  transition: var(--transition-accent);
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+img {
+  max-width: 100%;
+}
+
+button,
+input {
+  font-family: inherit;
+}
+
+/* ── FOCUS ───────────────────────────────────────────────────
+   Every interactive element gets a visible, accent-aware ring.
+   :focus-visible keeps it off mouse clicks. */
+:where(a, button, input, summary, [tabindex]):focus-visible {
+  outline: var(--border-thick) solid var(--accent);
+  outline-offset: var(--space-1);
+  border-radius: var(--radius-xs);
+}
+
+/* ── SCREEN-READER-ONLY ──────────────────────────────────── */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
