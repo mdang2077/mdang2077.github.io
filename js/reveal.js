@@ -12,6 +12,11 @@
      `clip-path` on both panes
      the stage's inline `height`, and only while sweeping
      the beam's `top`
+     `textContent` on the text leaves of both panes, and only
+       while relocking
+     `filter` and `opacity` on both panes, likewise
+     `aria-busy` on the stage, likewise
+     each section's `[data-relock-live]` announcement
 
    ctf.js goes on writing its display classes on `.challenge` /
    `.reveal`; the stylesheet neutralises them inside a ready stage,
@@ -24,7 +29,13 @@
       beam alone is the effect, and the churn was noise on top of
       it. §3's shared-proxy argument only ever existed to stop the
       two reading as a queue — with one effect there is no queue,
-      and no `textContent` writer left in this module.
+      and no `textContent` writer in the unlock direction.
+
+      Phase 5b brings the scramble back for the *relock* only, and
+      that is not a reversal of this. What was cut was churn layered
+      on top of the beam. The relock has no beam: there is nothing
+      for the scramble to compete with, because it is the whole of
+      the effect. See `PLAN.md` §5b.1.
 
    2. BYPASS SWEEPS. §5 has bypass jumping straight to `unlocked`
       with no beam. It now runs the same sweep the solves do, three
@@ -83,6 +94,128 @@ const BYPASS_STAGGER = 0.08;
    guarantees the end state to anyone who leaves and comes back. */
 const SAFETY = (SWEEP + BEAM_OUT + 1) * 1000;
 
+/* ── THE RELOCK, `PLAN.md` §5b ───────────────────────────────
+   Bypass off, and only bypass off. Every fraction below is a
+   fraction of RELOCK, so the beat table in the plan can be read
+   straight off these names:
+
+     0.00 - 0.42   the content pane encrypts, right -> left
+     0.43 - 0.57   the blur dip, with the pane swap and the height
+                   change buried inside it
+     0.58 - 1.00   the locked pane decrypts in, right -> left
+
+   Right -> left is load-bearing. The unlock beam sweeps down and
+   its decrypt ran left -> right; running this one the other way is
+   what makes it read as the first one being undone rather than as
+   a second, unrelated event. Both axes reverse or neither does. */
+const RELOCK = 0.9;
+const OUT_END = 0.42;
+const DIP_IN = 0.43;
+const SWAP = 0.5;
+const DIP_OUT = 0.57;
+const IN_START = 0.58;
+
+/* The dip is ~126ms of this, peaking exactly on the swap frame.
+   Longer and it reads as a page load; absent and the pill grid is
+   visibly seen becoming a challenge card. */
+const DIP_BLUR = 7;
+const DIP_DIM = 0.45;
+
+const RELOCK_SAFETY = (RELOCK + 1) * 1000;
+
+/* `ANIMATIONS.md` §2's alphabet, unchanged — the page has one idea
+   of what ciphertext looks like. */
+const GLYPH = '!<>-_\\/[]{}\u2014=+*^?#%01ABCDEF';
+const glyph = () => GLYPH[(Math.random() * GLYPH.length) | 0];
+
+/* Length-preserving, both of them, and that is the whole reason
+   the effect can run inside real geometry instead of over a
+   stand-in for it: the string a pill is showing is always exactly
+   as long as the one it will end on, so no pill changes width and
+   no flex row rewraps. Spaces never scramble, for the same reason.
+
+   `u` runs 0 -> 1 in both. Out: 0 is plain, 1 is fully glyphed,
+   eating inward from the right. In: the reverse, resolving from
+   the right. */
+function scrambleOut(target, u) {
+  const t = target.el.dataset.txt;
+  const from = t.length - Math.floor(u * t.length);
+  target.write(
+    [...t].map((c, i) => (i >= from && c !== ' ' ? glyph() : c)).join(''),
+  );
+}
+
+function scrambleIn(target, u) {
+  const t = target.el.dataset.txt;
+  const from = t.length - Math.floor(u * t.length);
+  target.write(
+    [...t].map((c, i) => (i >= from || c === ' ' ? c : glyph())).join(''),
+  );
+}
+
+/* Leaves only. Writing `textContent` on a container replaces its
+   children with a string, so one wrong selector here deletes every
+   pill in the pane. An element with no element children cannot be
+   that mistake.
+
+   Empty ones are skipped because there is nothing to scramble, and
+   `.visually-hidden` ones because scrambling text nobody can see
+   buys nothing and hands a screen reader garbage. */
+function leaves(pane) {
+  return Array.from(pane.querySelectorAll('*')).filter(
+    (el) =>
+      !el.firstElementChild &&
+      !el.classList.contains('visually-hidden') &&
+      el.textContent.trim() !== '',
+  );
+}
+
+/* A target is anything in the pane showing a string, which is the
+   text leaves plus one thing that is not a text node at all: the
+   answer input's placeholder. It is the only English left on the
+   card once the rest is ciphertext, and one legible line in the
+   middle of a decrypt is exactly the seam the effect is trying not
+   to have. The indirection exists for that one case; an element is
+   never both, because an input's `textContent` is empty and so it
+   never reaches `leaves`. */
+function targets(pane) {
+  const list = leaves(pane).map((el) => ({
+    el,
+    read: () => el.textContent,
+    write: (v) => {
+      el.textContent = v;
+    },
+  }));
+
+  pane.querySelectorAll('[placeholder]').forEach((el) => {
+    list.push({
+      el,
+      read: () => el.placeholder,
+      write: (v) => {
+        el.placeholder = v;
+      },
+    });
+  });
+
+  return list;
+}
+
+/* Read the real string once, while it is still real. After this,
+   what these elements are showing is glyphs, and reading it back
+   would bake them in permanently. */
+function cache(list) {
+  list.forEach((t) => {
+    t.el.dataset.txt = t.read();
+  });
+  return list;
+}
+
+function restore(list) {
+  list.forEach((t) => {
+    if (t.el.dataset.txt !== undefined) t.write(t.el.dataset.txt);
+  });
+}
+
 export function initReveal({ gsap = null, prefersReducedMotion = false } = {}) {
   const stages = Array.from(document.querySelectorAll('[data-stage]'));
   if (!stages.length) return;
@@ -94,15 +227,30 @@ export function initReveal({ gsap = null, prefersReducedMotion = false } = {}) {
   const animate = !!gsap && !prefersReducedMotion;
 
   const items = stages
-    .map((stage, index) => ({
-      index,
-      stage,
-      locked: stage.querySelector('[data-pane="locked"]'),
-      content: stage.querySelector('[data-pane="content"]'),
-      state: 'locked',
-      tl: null,
-      safety: null,
-    }))
+    .map((stage, index) => {
+      /* The name comes off the heading the section already points
+         at with `aria-labelledby`, so the announcement cannot drift
+         from the visible title the way a second copy of the string
+         in here would. */
+      const section = stage.closest('[data-section]');
+      const heading =
+        section && document.getElementById(section.getAttribute('aria-labelledby'));
+
+      return {
+        index,
+        stage,
+        locked: stage.querySelector('[data-pane="locked"]'),
+        content: stage.querySelector('[data-pane="content"]'),
+        live: section && section.querySelector('[data-relock-live]'),
+        name: heading ? heading.textContent.trim() : '',
+        state: 'locked',
+        tl: null,
+        safety: null,
+        /* Every target a relock is currently holding glyphed.
+           Non-null only in flight, and what `stop` restores from. */
+        leaves: null,
+      };
+    })
     .filter((item) => item.locked && item.content);
 
   if (!items.length) return;
@@ -118,8 +266,22 @@ export function initReveal({ gsap = null, prefersReducedMotion = false } = {}) {
      without having watched anything happen. Every reduced-motion
      path collapses to this function too. */
   function paint(item, state) {
+    const was = item.state;
     item.state = state;
     const open = state === 'unlocked';
+
+    /* Only the edge into `locked`, so the announcement is the news
+       that the section shut rather than a running commentary. `init`
+       enters `locked` from `locked` and says nothing, which is what
+       stops a page load announcing three closed sections.
+
+       Nothing else on the page carries this: bypass off leaves the
+       "n / 3 unlocked" label untouched, since the solved count has
+       not changed, and the badge's "[ locked ]" is not live. */
+    if (item.live) {
+      item.live.textContent =
+        state === 'locked' && was !== 'locked' ? `${item.name} section locked` : '';
+    }
 
     item.stage.removeAttribute('data-sweeping');
     item.stage.style.height = '';
@@ -142,20 +304,26 @@ export function initReveal({ gsap = null, prefersReducedMotion = false } = {}) {
      the browser cannot render mid-script — so the reveal is not
      visible even though it is real. */
   function measure(item) {
-    /* Both panes are in flow at this instant, so a trailing margin
-       collapses out of them exactly as it does in the settled
-       layout — which is the height the stage has to land on. The
-       absolutely positioned pane will be that margin taller during
-       the sweep, and the difference is empty space at the bottom
-       of a box that is clipped there anyway. */
-    const hL = item.locked.offsetHeight;
+    /* Whichever pane is hidden is shown for the length of one
+       synchronous read. Symmetrical because the relock measures
+       from the other side: there the content pane is the visible
+       one and the locked pane is the one that has to be un-hidden.
 
-    const wasHidden = item.content.hidden;
-    item.content.hidden = false;
-    const hC = item.content.offsetHeight;
-    item.content.hidden = wasHidden;
+       Each pane is measured in flow, so a trailing margin collapses
+       out of it exactly as it does in the settled layout — which is
+       the height the stage has to land on. The absolutely
+       positioned pane will be that margin taller while sweeping,
+       and the difference is empty space at the bottom of a box that
+       is clipped there anyway. */
+    const h = (pane) => {
+      const wasHidden = pane.hidden;
+      pane.hidden = false;
+      const height = pane.offsetHeight;
+      pane.hidden = wasHidden;
+      return height;
+    };
 
-    return { hL, hC };
+    return { hL: h(item.locked), hC: h(item.content) };
   }
 
   /* Tear a sweep down and leave nothing of it behind. Safe to call
@@ -171,6 +339,23 @@ export function initReveal({ gsap = null, prefersReducedMotion = false } = {}) {
     }
     const beam = item.stage.querySelector('.beam');
     if (beam) beam.remove();
+
+    /* Plain text back on every leaf before anything else can read
+       it. A relock torn down mid-flight — bypass thrown straight
+       back on, the safety timer firing — must not leave glyphs in
+       the DOM, and must not leave `dataset.txt` as the only copy of
+       the real string. */
+    if (item.leaves) {
+      restore(item.leaves);
+      item.leaves = null;
+    }
+
+    item.stage.removeAttribute('aria-busy');
+    item.locked.style.filter = '';
+    item.content.style.filter = '';
+    item.locked.style.opacity = '';
+    item.content.style.opacity = '';
+
     busy.delete(item);
   }
 
@@ -257,6 +442,165 @@ export function initReveal({ gsap = null, prefersReducedMotion = false } = {}) {
     }, SAFETY + delay * 1000);
   }
 
+  /* ── THE RELOCK ─────────────────────────────────────────────
+     `PLAN.md` §5b. The unlock's opposite in every axis, and it
+     shares none of its machinery: no beam, no clip-path, nothing
+     overlaid, nothing cloned, no intermediate element. Each leaf
+     scrambles inside its own box, so every frame is real DOM
+     geometry rather than a stand-in for it — which is exactly what
+     the rejected first prototype got wrong.
+
+     The two panes still trade places, and that swap is the one
+     frame the effect cannot show honestly: a pill grid becoming a
+     challenge card in a single tick reads as a glitch however
+     slowly the rest of it runs. So it happens inside the dip, and
+     the stage's height change is timed to the same window for the
+     same reason. */
+  function relock(item) {
+    const { stage, locked, content } = item;
+    const { hL, hC } = measure(item);
+
+    item.state = 'relocking';
+    busy.add(item);
+
+    /* Cached here rather than once at setup, and this is the only
+       safe moment for it: the busy set guarantees no relock is in
+       flight, so nothing is glyphed, and ctf.js may have written
+       `// incorrect. try again.` into the challenge message since
+       the last time this ran. Read now, never read again until
+       this relock has settled. */
+    const outLeaves = cache(targets(content));
+    const inLeaves = cache(targets(locked));
+    item.leaves = outLeaves.concat(inLeaves);
+
+    /* Pin the height the stage is already at before the panes leave
+       flow, so it never passes through a frame with nothing in it
+       to hold it open. */
+    stage.style.height = `${hC}px`;
+    stage.dataset.sweeping = '';
+
+    /* Mid-flight glyphs are garbage to a screen reader, and unlike
+       the sweep — where the content is final from the first frame
+       and merely clipped — here it genuinely is not text yet. */
+    stage.setAttribute('aria-busy', 'true');
+
+    /* Ciphertext before it is ever on screen. One plain frame at
+       the swap would give the ending away 400ms early. */
+    inLeaves.forEach((t) => scrambleIn(t, 0));
+
+    const out = { v: 0 };
+    const dip = { v: 0 };
+    const churn = { v: 0 };
+    const inn = { v: 0 };
+
+    /* On the panes rather than on the stage: the stage clips, and a
+       filter applied there would bleed its blur out past the clip
+       and over the section header. */
+    const paintDip = () => {
+      const f = dip.v ? `blur(${(dip.v * DIP_BLUR).toFixed(2)}px)` : '';
+      const o = dip.v ? String(1 - dip.v * DIP_DIM) : '';
+      locked.style.filter = f;
+      content.style.filter = f;
+      locked.style.opacity = o;
+      content.style.opacity = o;
+    };
+
+    item.tl = gsap.timeline({
+      onComplete: () => {
+        stop(item);
+        paint(item, 'locked');
+      },
+    });
+
+    item.tl
+      /* Linear, both scrambles. An eased wipe reads as a thing
+         being animated; a steady one reads as a thing being
+         processed, which is what this is pretending to be. */
+      .to(
+        out,
+        {
+          v: 1,
+          duration: RELOCK * OUT_END,
+          ease: 'none',
+          onUpdate: () => outLeaves.forEach((t) => scrambleOut(t, out.v)),
+        },
+        0,
+      )
+      .to(
+        dip,
+        {
+          v: 1,
+          duration: RELOCK * (SWAP - DIP_IN),
+          ease: 'power2.in',
+          onUpdate: paintDip,
+        },
+        RELOCK * DIP_IN,
+      )
+      .to(
+        dip,
+        {
+          v: 0,
+          duration: RELOCK * (DIP_OUT - SWAP),
+          ease: 'power2.out',
+          onUpdate: paintDip,
+        },
+        RELOCK * SWAP,
+      )
+      /* Height and swap both inside the dip, so §4b still holds:
+         the stage carries an inline height only while it is
+         moving, and drops back to auto the moment it settles. */
+      .to(
+        stage,
+        {
+          height: hL,
+          duration: RELOCK * (DIP_OUT - DIP_IN),
+          ease: 'power2.inOut',
+        },
+        RELOCK * DIP_IN,
+      )
+      .call(
+        () => {
+          content.hidden = true;
+          locked.hidden = false;
+        },
+        null,
+        RELOCK * SWAP,
+      )
+      /* The swapped-in pane holds at fully glyphed for ~70ms before
+         it starts resolving. This tween's only job is to keep
+         re-rolling those glyphs across that gap: frozen ciphertext
+         under a clearing blur looks like a dropped frame. */
+      .to(
+        churn,
+        {
+          v: 1,
+          duration: RELOCK * (IN_START - SWAP),
+          ease: 'none',
+          onUpdate: () => inLeaves.forEach((t) => scrambleIn(t, 0)),
+        },
+        RELOCK * SWAP,
+      )
+      .to(
+        inn,
+        {
+          v: 1,
+          duration: RELOCK * (1 - IN_START),
+          ease: 'none',
+          onUpdate: () => inLeaves.forEach((t) => scrambleIn(t, inn.v)),
+        },
+        RELOCK * IN_START,
+      );
+
+    /* Same guarantee the sweep makes, and it matters more here:
+       a relock stopped by a backgrounded tab would leave glyphs
+       frozen in the DOM, not merely a clipped pane. */
+    item.safety = window.setTimeout(() => {
+      if (!busy.has(item)) return;
+      stop(item);
+      paint(item, 'locked');
+    }, RELOCK_SAFETY);
+  }
+
   /* ── ENTRY ──────────────────────────────────────────────────
      The same `ctf:state` every other module listens to. Two routes
      animate — a live solve, and bypass being switched on — and
@@ -286,6 +630,24 @@ export function initReveal({ gsap = null, prefersReducedMotion = false } = {}) {
       if ((solving || bypassing) && animate) {
         stop(item);
         sweep(item, bypassing ? step++ * BYPASS_STAGGER : 0);
+        return;
+      }
+
+      /* The relock, and the only route to it. `!open` is the whole
+         of the "solved sections never relock" rule — a solved
+         section is open whatever bypass is doing, so this is false
+         for it and it falls through to the no-op below.
+
+         `state === 'unlocked'` is the other half: a section still
+         mid-sweep when the switch goes back off was never fully
+         open, so it is dropped shut flat rather than being given a
+         payoff-shaped undo of something it never finished. */
+      const relocking =
+        detail.reason === 'bypass-off' && !open && item.state === 'unlocked';
+
+      if (relocking && animate) {
+        stop(item);
+        relock(item);
         return;
       }
 

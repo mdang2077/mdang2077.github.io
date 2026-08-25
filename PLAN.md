@@ -13,7 +13,7 @@ committable, deployable site. Branch: `feat/v3-motion`. Never commit to `main`.
 | 3 | Hero lock — WebGL padlock, scroll shine, 3D unlock | **done** |
 | 4 | Unlock system — run log + pin rail + hero lock + bypass relock | **done** |
 | 5 | Section unlock — redraw scanline (`ANIMATIONS.md` effect A, then B) | **done** |
-| 5b | Relock — in-place scramble on bypass off | todo |
+| 5b | Relock — in-place scramble on bypass off | **done** |
 | 6 | Approved extras | todo |
 | 7 | Polish + full audit | todo |
 
@@ -1155,6 +1155,52 @@ The busy set still applies: a section already relocking does not start again.
 - Reduced motion, and JS disabled — both readable, both correct.
 - Screenshot diff of the settled `locked` state against phase 4's — identical.
 
+### 8. Build notes — what shipped, and the five places it deviates
+
+All of §7 verified against headless Chrome: 31 assertions covering the
+invariants above, plus a hand scrub at 0.42 / 0.50 / 0.58 that measures the
+laid-out box of every visible leaf and asserts there is no `pre`, `canvas` or
+proxy element in the stage at any of the three. Settled heights come back
+269 / 291 / 289px, identical to the baseline captured before the relock ran.
+
+**a. The placeholder scrambles too.** §4 says text leaves; the answer input's
+placeholder is not one — it is an attribute, not a text node. Left alone it sat
+there reading `enter decoded phrase...` in plain English while the card around
+it was still ciphertext, which is precisely the seam the effect exists to
+avoid. A target is now `{ el, read, write }` and the placeholder is the one
+case that is not `textContent`. Nothing is ever both: an input's `textContent`
+is empty, so it never reaches the leaf filter.
+
+**b. `dataset.txt` is cached at the start of each relock, not once at setup.**
+§4 says once, and once is wrong here: ctf.js writes `// incorrect. try again.`
+into `.challenge-msg` at any time, so a cache taken at load would restore a
+message that has since changed. Reading at the start of a relock is safe for
+the reason §4 gives for reading early — the busy set guarantees nothing is
+scrambled at that moment, and every exit path, `stop()` included, restores
+before anything else can read.
+
+**c. The announcement needed a live region that did not exist.** §6 asks for
+`"skills section locked"` on the section's live region, and the section did not
+have one. `.challenge-msg` is the wrong element — it is visible, and it belongs
+to the form. Each section now carries a `visually-hidden [data-relock-live]`,
+written only on the `unlocked -> locked` edge, so `init` announces nothing and
+a section that never opened announces nothing. It is outside the stage: inside,
+it would be clipped by the sweep and scrambled by the relock.
+
+**d. The dip is on the panes, not the stage.** A filter on the stage is applied
+after the stage's own `overflow: hidden`, so its blur bled ~20px past the clip
+and over the section header. On the panes it is clipped like everything else.
+
+**e. Nothing is staggered.** Bypass *on* staggers its three sweeps; bypass off
+runs all three relocks together. §5b.3 is the reason — both rejected prototypes
+staggered element exits and both had a dead frame where the old content had
+left and the new had not arrived. The dip covers one seam per section; three
+offset dips would be three separate seams to cover.
+
+One thing that is not a deviation but is worth writing down: the swapped-in
+pane holds fully glyphed for ~70ms between the swap at 0.50 and the decrypt at
+0.58, and a tween whose only job is to re-roll those glyphs runs across that
+gap. Frozen ciphertext under a clearing blur reads as a dropped frame.
 
 ---
 
