@@ -268,7 +268,7 @@ the combined prototype wins** (see §3, the camera trap).
 | Hero lock is a Three.js WebGL scene | locked |
 | 3D unlock, including the sideways `rotation.y` shackle swing | locked, approved |
 | Light animation is a scroll-driven shine sweep, independent of the unlock | locked |
-| Body is dark gunmetal, shackle is polished chrome | locked |
+| Body is dark gunmetal, shackle is polished chrome | **overridden** — both are chrome, see 3R notes |
 | Lock renders at 1.5x the hero name type size | locked |
 | Lock opens once, when all three puzzles are complete | locked (§5, our deviation) |
 
@@ -817,6 +817,24 @@ the number the constraint was always about, and it leaves ~285KB of headroom.
    This also deletes the spec §9 constraint that the emissive colour come from
    a theme token, and with it the fact that Three r128 cannot parse our
    space-separated `hsl(h s l)` values.
+
+**A third deviation, added after looking at it on screen.** `LOCK_SPEC.md` §1
+locks the body as dark gunmetal and says explicitly not to raise it toward
+mirror chrome. Built that way, the body's flat face came back as one untextured
+tone — it read as plastic beside the SVG lock's hard mirror banding, and the
+SVG's material was the one worth keeping. **Both parts are now polished chrome**,
+separated by tone rather than by finish: the shackle is the brighter of the two.
+
+Getting the banding onto the body needed one non-obvious thing. **The body and
+the shackle carry their own environment maps**, because no single one serves
+both. A flat face at this camera reflects only ~35 degrees of the environment —
+about 50px of a 512px equirect — so the prototype's 26-74px softboxes left the
+body inside a single bar, a mirror with nothing to mirror. The tube is the
+opposite case: its curvature sweeps the whole map in a few screen pixels, so
+bars fine enough to band the body alias into ringing on the shackle. The body
+reflects a 26px repeating ramp built from the SVG lock's own stop sequence; the
+shackle keeps the wide softboxes. The tube also went from 22 radial segments to
+36, since its own faceting showed against the finer pattern.
 
 Also decided in the build: **beat 4 swings to -1.2 rad**, not the prototype's
 -1.9, where the shackle reads edge-on as a rod.

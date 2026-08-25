@@ -155,8 +155,14 @@
   /* The WebGL lock's lighting and materials. They live here rather
      than as hex literals in js/lock3d.js so the lock re-themes
      from the same place as everything else. No accent among them:
-     with the emissive flash cut, the lock carries no colour at all. */
-  --dark-lock-shell:  #171b21;   /* body — dark gunmetal */
+     with the emissive flash cut, the lock carries no colour at all.
+
+     Body and shackle are BOTH polished chrome. LOCK_SPEC §1 has
+     the body as dark gunmetal and says not to raise it — that was
+     tried, and the flat gunmetal face read as plastic next to the
+     SVG lock's hard mirror banding. The two finishes now differ by
+     tone rather than by material. */
+  --dark-lock-shell:  #c2ccd8;   /* body — chrome, one step cooler */
   --dark-lock-steel:  #dfe5ee;   /* shackle — mirror chrome */
   --dark-lock-rim:    #9fc4ff;
   --dark-lock-hemi-ground: #0a0b0e;
@@ -214,10 +220,10 @@
   --light-metal-lo:  #3a3f3c;
   --light-lock-contour: rgba(58, 63, 60, 0.5);
 
-  /* The gunmetal body stays dark on paper. It lightens only enough
-     to separate from the ground — it never becomes a mirror. The
-     shackle/body contrast is the design in both themes. */
-  --light-lock-shell:  #424953;
+  /* On paper the whole lock compresses toward off-white and leans
+     on the cast shadow and the dark side of its own banding to
+     separate from the ground. */
+  --light-lock-shell:  #cfd6de;
   --light-lock-steel:  #f0f3f7;
   --light-lock-rim:    #ffe9c4;
   --light-lock-hemi-ground: #d8d3c4;

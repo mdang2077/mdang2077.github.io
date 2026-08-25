@@ -67,8 +67,22 @@ function tokenNumber(name, fallback) {
 
 /* The procedural studio environment: a gradient sky with hard
    vertical softbox bars and near-black gaps between them. 512x256
-   canvas, no asset, no extra dependency. */
-function makeStudioEnv(THREE, renderer, light) {
+   canvas, no asset, no extra dependency.
+
+   Two of these are built, and which one a surface reflects is what
+   makes it read correctly:
+
+     `fine`  — a 26px repeating ramp, for the body's flat face.
+     `broad` — wide softboxes, for the shackle's tube.
+
+   The reason is angular coverage. A flat face at this camera
+   distance reflects only ~35 degrees of the environment, about
+   50px of a 512px map, so wide bars leave it a mirror with nothing
+   to mirror — one flat tone. The tube is the opposite case: its
+   curvature sweeps the whole map in a few pixels of screen, so
+   fine bars alias into ringing. One environment cannot serve both,
+   so the materials carry their own. */
+function makeStudioEnv(THREE, renderer, light, fine) {
   const c = document.createElement('canvas');
   c.width = 512;
   c.height = 256;
@@ -89,19 +103,49 @@ function makeStudioEnv(THREE, renderer, light) {
   g.fillStyle = sky;
   g.fillRect(0, 0, 512, 256);
 
-  [[24, 58], [132, 30], [188, 74], [300, 26], [352, 46], [452, 36]].forEach(
-    ([x, w], i) => {
-      g.fillStyle = i % 2
-        ? light ? 'rgba(255,255,255,.85)' : 'rgba(205,224,255,.9)'
-        : '#ffffff';
-      g.fillRect(x, 0, w, 150);
-    },
-  );
+  /* Fine, high-contrast vertical bars, repeated across the whole
+     map. The width matters more than it looks: a flat face at this
+     camera distance reflects only ~35 degrees of the environment,
+     which is about 50px of a 512px equirect. The prototype's bars
+     were 26-74px wide, so the body's front face landed inside a
+     single bar and came back one flat tone — a mirror with nothing
+     to mirror. At a 26px period the face sweeps roughly two full
+     cycles and picks up the hard bright/dark banding that reads as
+     polished chrome.
 
-  g.fillStyle = light ? 'rgba(60,62,68,.55)' : 'rgba(0,0,0,.92)';
-  [[82, 50], [162, 26], [262, 38], [398, 54]].forEach(([x, w]) =>
-    g.fillRect(x, 0, w, 150),
-  );
+     The sequence within each cycle is the SVG lock's ramp — bright
+     edge, mid, dark core, mid, bright rim — so both renderings of
+     the lock describe the same material. */
+  if (fine) {
+    /* The sequence within each cycle is the SVG lock's ramp —
+       bright edge, mid, dark core, mid, bright rim — so both
+       renderings of the lock describe the same material. */
+    const PERIOD = 26;
+    const BAND = light
+      ? [[0, 5, '#ffffff'], [5, 9, '#b9bec6'], [9, 20, '#4a4d53'], [20, 24, '#c8ccd3']]
+      : [[0, 5, '#ffffff'], [5, 9, '#8b95a6'], [9, 20, '#05070b'], [20, 24, '#aebbd0']];
+
+    for (let x = 0; x < 512; x += PERIOD) {
+      BAND.forEach(([from, to, colour]) => {
+        g.fillStyle = colour;
+        g.fillRect(x + from, 0, to - from, 168);
+      });
+    }
+  } else {
+    [[24, 58], [132, 30], [188, 74], [300, 26], [352, 46], [452, 36]].forEach(
+      ([x, w], i) => {
+        g.fillStyle = i % 2
+          ? light ? 'rgba(255,255,255,.85)' : 'rgba(205,224,255,.9)'
+          : '#ffffff';
+        g.fillRect(x, 0, w, 150);
+      },
+    );
+
+    g.fillStyle = light ? 'rgba(60,62,68,.55)' : 'rgba(0,0,0,.92)';
+    [[82, 50], [162, 26], [262, 38], [398, 54]].forEach(([x, w]) =>
+      g.fillRect(x, 0, w, 150),
+    );
+  }
 
   const texture = new THREE.CanvasTexture(c);
   texture.mapping = THREE.EquirectangularReflectionMapping;
@@ -180,8 +224,8 @@ export function createLockScene({ THREE, gsap, stage, theme, prefersReducedMotio
     roughness: 0.1,
   });
   const shell = new THREE.MeshStandardMaterial({
-    metalness: 0.94,
-    roughness: 0.19,
+    metalness: 1.0,
+    roughness: 0.08,
   });
   const recess = new THREE.MeshStandardMaterial({
     color: 0x07080b,
@@ -259,8 +303,10 @@ export function createLockScene({ THREE, gsap, stage, theme, prefersReducedMotio
   shackle.position.set(-ARC, 0, 0);
   pivot.add(shackle);
 
+  /* 36 radial segments, not the prototype's 22: against bars this
+     fine the tube's own faceting shows up as ringing. */
   const arc = new THREE.Mesh(
-    new THREE.TorusGeometry(ARC, TUBE, 22, 56, Math.PI),
+    new THREE.TorusGeometry(ARC, TUBE, 36, 72, Math.PI),
     steel,
   );
   arc.position.y = ARC_Y;
@@ -272,7 +318,7 @@ export function createLockScene({ THREE, gsap, stage, theme, prefersReducedMotio
 
   [-ARC, ARC].forEach((x) => {
     const leg = new THREE.Mesh(
-      new THREE.CylinderGeometry(TUBE, TUBE, legLen, 22),
+      new THREE.CylinderGeometry(TUBE, TUBE, legLen, 36),
       steel,
     );
     leg.position.set(x, (legTop + legBot) / 2, 0);
@@ -324,8 +370,19 @@ export function createLockScene({ THREE, gsap, stage, theme, prefersReducedMotio
     steel.color.setHex(token('--lock-steel', light ? 0xf0f3f7 : 0xdfe5ee));
     floorMat.opacity = tokenNumber('--lock-floor-opacity', light ? 0.2 : 0.42);
 
-    if (scene.environment) scene.environment.dispose();
-    scene.environment = makeStudioEnv(THREE, renderer, light);
+    /* PMREM output is a GPU texture: dispose both or every theme
+       toggle leaks one. */
+    if (steel.envMap) steel.envMap.dispose();
+    if (shell.envMap) shell.envMap.dispose();
+
+    steel.envMap = makeStudioEnv(THREE, renderer, light, false);
+    shell.envMap = makeStudioEnv(THREE, renderer, light, true);
+    steel.needsUpdate = true;
+    shell.needsUpdate = true;
+
+    /* Anything without its own envMap — the keyhole recess — falls
+       back to this. */
+    scene.environment = steel.envMap;
   }
 
   applyTheme(theme);
@@ -386,7 +443,8 @@ export function createLockScene({ THREE, gsap, stage, theme, prefersReducedMotio
       running = false;
       io.disconnect();
       window.removeEventListener('resize', resize);
-      if (scene.environment) scene.environment.dispose();
+      if (steel.envMap) steel.envMap.dispose();
+      if (shell.envMap) shell.envMap.dispose();
       renderer.dispose();
       canvas.remove();
     },
