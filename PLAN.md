@@ -1157,7 +1157,7 @@ The busy set still applies: a section already relocking does not start again.
 
 ### 8. Build notes — what shipped, and the five places it deviates
 
-All of §7 verified against headless Chrome: 31 assertions covering the
+All of §7 verified against headless Chrome: 38 assertions covering the
 invariants above, plus a hand scrub at 0.42 / 0.50 / 0.58 that measures the
 laid-out box of every visible leaf and asserts there is no `pre`, `canvas` or
 proxy element in the stage at any of the three. Settled heights come back
@@ -1191,7 +1191,22 @@ it would be clipped by the sweep and scrambled by the relock.
 after the stage's own `overflow: hidden`, so its blur bled ~20px past the clip
 and over the section header. On the panes it is clipped like everything else.
 
-**e. Nothing is staggered.** Bypass *on* staggers its three sweeps; bypass off
+**e. A section still sweeping open relocks too, from the dip.** This was the
+bug that made the effect look like it had not shipped. Mid-sweep sections were
+dropped shut flat — "it was never fully open, so it gets no payoff-shaped
+undo" — which sounds principled until you notice the sweep runs for ~1.9s and
+that throwing a switch back within two seconds of throwing it is what anyone
+does while they are watching what the switch does. Toggle, toggle back, nothing
+scrambles. Measured at 800ms and 1500ms: all three sections jumped.
+
+They now relock like any other, seeking the timeline to the dip rather than
+starting at zero. Seeking there renders the encrypt at its end, so the pane the
+section snaps to is full of ciphertext rather than full of readable text, which
+is what lets the snap pass as the encryption finishing rather than as the
+reveal it interrupted completing in one frame. ~510ms rather than ~900: less
+was shown, so there is less to undo.
+
+**f. Nothing is staggered.** Bypass *on* staggers its three sweeps; bypass off
 runs all three relocks together. §5b.3 is the reason — both rejected prototypes
 staggered element exits and both had a dead frame where the old content had
 left and the new had not arrived. The dip covers one seam per section; three

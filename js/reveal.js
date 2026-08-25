@@ -456,7 +456,7 @@ export function initReveal({ gsap = null, prefersReducedMotion = false } = {}) {
      slowly the rest of it runs. So it happens inside the dip, and
      the stage's height change is timed to the same window for the
      same reason. */
-  function relock(item) {
+  function relock(item, from = 0) {
     const { stage, locked, content } = item;
     const { hL, hC } = measure(item);
 
@@ -478,6 +478,15 @@ export function initReveal({ gsap = null, prefersReducedMotion = false } = {}) {
        to hold it open. */
     stage.style.height = `${hC}px`;
     stage.dataset.sweeping = '';
+
+    /* Rigged explicitly rather than assumed, because this is also
+       the entry point for a section caught mid-sweep, which arrives
+       with both panes showing and both of them clipped. Written
+       every time: a settled section already holds these values. */
+    locked.hidden = true;
+    content.hidden = false;
+    locked.style.clipPath = '';
+    content.style.clipPath = '';
 
     /* Mid-flight glyphs are garbage to a screen reader, and unlike
        the sweep — where the content is final from the first frame
@@ -511,6 +520,14 @@ export function initReveal({ gsap = null, prefersReducedMotion = false } = {}) {
         paint(item, 'locked');
       },
     });
+
+    /* `from` is the seek at the bottom of this function, and it is
+       non-zero only for a section caught mid-sweep. Seeking to the
+       dip renders the encrypt at its end, so the pane it snaps to
+       is full of ciphertext rather than full of readable text —
+       which is what lets the snap pass as the encryption finishing
+       rather than as the reveal it interrupted completing in a
+       single frame. Less was shown, so there is less to undo. */
 
     item.tl
       /* Linear, both scrambles. An eased wipe reads as a thing
@@ -591,6 +608,8 @@ export function initReveal({ gsap = null, prefersReducedMotion = false } = {}) {
         RELOCK * IN_START,
       );
 
+    if (from) item.tl.time(RELOCK * from);
+
     /* Same guarantee the sweep makes, and it matters more here:
        a relock stopped by a backgrounded tab would leave glyphs
        frozen in the DOM, not merely a clipped pane. */
@@ -633,21 +652,29 @@ export function initReveal({ gsap = null, prefersReducedMotion = false } = {}) {
         return;
       }
 
-      /* The relock, and the only route to it. `!open` is the whole
-         of the "solved sections never relock" rule — a solved
-         section is open whatever bypass is doing, so this is false
-         for it and it falls through to the no-op below.
+      /* The relock. `!open` is the whole of the "solved sections
+         never relock" rule — a solved section is open whatever
+         bypass is doing, so this is false for it and it falls
+         through to the no-op below.
 
-         `state === 'unlocked'` is the other half: a section still
-         mid-sweep when the switch goes back off was never fully
-         open, so it is dropped shut flat rather than being given a
-         payoff-shaped undo of something it never finished. */
+         A section still sweeping open relocks too, and that is the
+         common case rather than the edge one: the sweep runs for
+         ~1.9s, and throwing a switch back within two seconds of
+         throwing it is what anyone does while they are looking at
+         what the switch does. It was dropped shut flat here at
+         first — "it was never fully open, so it gets no payoff-
+         shaped undo" — which sounded principled and in practice
+         meant the effect did not exist for the way the button is
+         actually used. It starts from the dip instead. */
+      const midSweep = item.state === 'unlocking';
       const relocking =
-        detail.reason === 'bypass-off' && !open && item.state === 'unlocked';
+        detail.reason === 'bypass-off' &&
+        !open &&
+        (item.state === 'unlocked' || midSweep);
 
       if (relocking && animate) {
         stop(item);
-        relock(item);
+        relock(item, midSweep ? DIP_IN : 0);
         return;
       }
 
