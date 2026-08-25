@@ -344,23 +344,33 @@ export function initHud({ gsap = null, prefersReducedMotion = false } = {}) {
 
     const solving = detail.reason === 'solve' && detail.index !== null;
 
+    if (!solving) {
+      renderPins(detail, { popIndex: -1 });
+      return;
+    }
+
+    /* The seat is the beat the hero lock chains off, so it is
+       announced at the moment it happens rather than inferred from
+       the state event — which fires a whole flight earlier. */
+    const seat = () => {
+      renderPins(detail, { popIndex: detail.index });
+      document.dispatchEvent(
+        new CustomEvent('hud:seated', { detail: { index: detail.index } }),
+      );
+    };
+
     /* On a solve the pin waits for the glyph: the flight is what
        explains why the pin lit up. If the flight is skipped — no
        GSAP, reduced motion, hidden tab, hero off-screen — the pin
        seats immediately instead, with the same end state. */
-    if (solving) {
-      const flying = flyTo(detail.index, () =>
-        renderPins(detail, { popIndex: detail.index }),
+    if (flyTo(detail.index, seat)) {
+      renderPins(
+        { ...detail, solved: detail.solved.map((v, i) => (i === detail.index ? false : v)) },
+        { popIndex: -1 },
       );
-      if (flying) {
-        renderPins(
-          { ...detail, solved: detail.solved.map((v, i) => (i === detail.index ? false : v)) },
-          { popIndex: -1 },
-        );
-        return;
-      }
+      return;
     }
 
-    renderPins(detail, { popIndex: solving ? detail.index : -1 });
+    seat();
   });
 }

@@ -688,8 +688,10 @@ Phase 4 adds choreography to plumbing that already works end to end.
    still with no flights and no hero timeline. Solving now seats pins and
    prints lines.~~ **done**
 2. ~~Add the flight clone and its guards.~~ **done**
-3. Build the hero unlock timeline in `animations.js`, triggered off
-   `data-solved`. Verify play and reverse in isolation before wiring bypass.
+3. ~~Build the hero unlock timeline in `animations.js`, triggered off
+   `data-solved`. Verify play and reverse in isolation before wiring bypass.~~
+   **done** — the timeline itself already shipped in phase 3, inside
+   `lock3d.js` where the meshes are; `animations.js` owns *when* it plays.
 4. Wire the bypass staggered run and the relock reverse.
 5. Reduced-motion pass over all four, then the spam-toggle pass.
 
@@ -733,6 +735,39 @@ instant state with no flights and no typing.
 
 Bypass still applies its state instantly — correct, just not yet choreographed.
 That is step 4.
+
+### 6c. Step 3 notes
+
+**`animations.js` owns *when* the lock opens, not how.** The three beats stay in
+`lock3d.js`, because they are transforms on meshes only that module can see.
+What this step added is the sequencing rule from §4: on the run that completes
+the set, the third pin's seat chains straight into beat 1.
+
+Firing both off the same `ctf:state` event — which is what `main.js` did
+before — opened the lock while the glyph was still in the air and before the pin
+it was flying to had lit. The payoff landed ahead of the build-up. So `hud.js`
+now dispatches **`hud:seated`** at the moment a solving pin seats, and
+`animations.js` holds beat 1 until it arrives.
+
+**The init order in `main.js` is now load-bearing, and it is commented as
+such.** `initAnimations` must subscribe *before* `initHud`, because a solve
+whose flight is skipped seats its pin **synchronously** inside the `ctf:state`
+dispatch — subscribe the other way round and the seat announcement arrives
+before `animations.js` knows it is waiting for one. Verified directly: with the
+hero scrolled out of view, the third solve opens the lock on the same frame.
+
+**The wait is a courtesy, never a dependency.** A 900ms fallback timer opens the
+lock if the seat never arrives — no pin rail in the DOM, a hidden tab, a flight
+killed mid-air. Any other state change calls `clearPending()`, so the timer can
+never fire into a state it no longer applies to.
+
+**Verified:** the lock holds `progress 0` through both earlier solves *and*
+through the whole 520ms flight of the third, then plays 0 -> 0.56 -> 1.00 from
+the instant the pin seats. Bypass-on plays it, bypass-off reverses it (and
+visibly faster — `timeScale(1/0.7)`). Ten bypass clicks leave the timeline at
+exactly 0.00 with `aria-pressed=false`. Under reduced motion it jumps 0 <-> 1
+with no tweening. Bypass toggled while all three are genuinely solved changes
+nothing, which is correct.
 
 ---
 
