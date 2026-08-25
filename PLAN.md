@@ -13,6 +13,7 @@ committable, deployable site. Branch: `feat/v3-motion`. Never commit to `main`.
 | 3 | Hero lock — WebGL padlock, scroll shine, 3D unlock | **done** |
 | 4 | Unlock system — run log + pin rail + hero lock + bypass relock | **done** |
 | 5 | Section unlock — redraw scanline (`ANIMATIONS.md` effect A, then B) | **done** |
+| 5b | Relock — in-place scramble on bypass off | todo |
 | 6 | Approved extras | todo |
 | 7 | Polish + full audit | todo |
 
@@ -1038,6 +1039,122 @@ On top of the standing per-phase checks:
 - Keyboard-only — focus is never trapped inside a clipped pane; the content pane
   must not be reachable while it is still clipped closed.
 - Screenshot diff of the settled `unlocked` state against phase 4's — identical.
+
+---
+
+## Phase 5b — relock: the in-place scramble
+
+Approved from a live prototype after four alternatives were rejected. This is
+the **relock** direction only. The unlock sweep from phase 5 is untouched.
+
+### 1. This does not contradict §4c
+
+§4c cut the scramble, and it stays cut **where it was cut**: layered on top of
+the unlock beam, where the churn was noise competing with the sweep. That
+judgement was about two effects fighting for the same moment.
+
+The relock has no beam. The scramble is not on top of anything here — it *is*
+the effect, and it is the only thing on screen. Different context, opposite
+conclusion, both correct. Do not collapse the two.
+
+### 2. What it replaces
+
+Bypass off currently jumps bypass-only sections shut instantly (§4c, third
+bullet). That stays right in spirit — going back is not a payoff — but instant
+is not the same as *free*, and a section vanishing between frames reads as a
+bug rather than a decision. ~900ms, and the reverse direction does the work of
+saying "this is being undone."
+
+Sections the visitor actually **solved never relock.** Only sections open purely
+because of bypass close, exactly as today.
+
+### 3. The rejected approach, so it is not rebuilt
+
+The first prototype rendered a monospace glyph *silhouette* over the block: one
+`<pre>`-style overlay whose line count and line lengths lerped from the content's
+shape to the challenge card's, hiding the height change inside the illegible
+middle.
+
+It was rejected on sight, and the reason is structural, not tunable. A monospace
+text blob is not the shape of a wrapped pill grid and it is not the shape of the
+challenge card either, so it mismatched at **both** ends — glyphs appearing in a
+silhouette the pills never had, then resolving into a silhouette the card never
+had. **Never render a stand-in shape.** Every frame shows real DOM geometry.
+
+### 4. The effect
+
+Each leaf element scrambles **inside its own box**. Nothing is overlaid, nothing
+is cloned, no intermediate element exists.
+
+| t | Beat |
+|---|---|
+| 0.00–0.42 | every `.tg` and `.blk-t` in the content pane encrypts, right → left |
+| 0.43–0.57 | blur-dip covers the pane exchange; stage height retimes here |
+| 0.58–1.00 | every text leaf in the locked pane decrypts in, right → left |
+
+**Three things carry it. All three are load-bearing:**
+
+- **Length-preserving glyph strings.** The scrambled string is exactly as long as
+  the original, so a pill's width never changes and the flex rows never rewrap.
+  Losing this is the whole failure mode of the old approach arriving by a
+  smaller door.
+- **Right → left.** Phase 5's beam sweeps down and its decrypt runs left → right.
+  Running the relock the other way is what makes it read as *undoing* rather than
+  as a second, unrelated event. Both axes reverse or neither does.
+- **The dip is short and covers the swap frame.** ~140ms of `blur(7px)` plus a
+  45% dim, peaking exactly where the two panes exchange. Longer and it reads as
+  a page load; absent and the pill grid visibly becomes a card.
+
+```js
+// length-preserving, eats inward from the right
+function scrambleOut(el, u){                 // u 0 = plain, 1 = fully glyphed
+  const t = el.dataset.txt, from = t.length - Math.floor(u * t.length);
+  el.textContent = [...t].map((c,i) => (i >= from && c !== ' ') ? glyph() : c).join('');
+}
+function scrambleIn(el, u){                  // u 0 = fully glyphed, 1 = plain
+  const t = el.dataset.txt, from = t.length - Math.floor(u * t.length);
+  el.textContent = [...t].map((c,i) => (i >= from || c === ' ') ? c : glyph()).join('');
+}
+```
+
+Cache `dataset.txt` on every leaf once, at setup. Reading `textContent` back
+after a scramble has started returns glyphs and permanently corrupts the target.
+
+### 5. Fits the shipped layout, not `ANIMATIONS.md`'s
+
+Panes go absolute only for the duration of the relock and the stage carries no
+inline height once settled — §4b's model, unchanged. The height retimes inside
+the dip, so it needs no separate treatment and no `BUSY`-guarded resize handler.
+The busy set still applies: a section already relocking does not start again.
+
+### 6. Landmines
+
+- **`textContent`, never `innerHTML`.** Rewriting per frame through `innerHTML`
+  re-parses markup 60x/sec and would destroy every pill in the pane.
+- **Scramble leaves only.** `.tg` and `.blk-t`, never `.tags` or `.blk` — writing
+  `textContent` on a container deletes its children.
+- **No dead frame at the midpoint.** Both prototype variants that staggered
+  element exits had a gap where the old content had left and the new had not
+  arrived. Here the dip covers it; if the dip is ever retimed, check the seam.
+- **`aria-busy="true"`** on the stage for the duration; mid-flight glyphs are
+  garbage to a screen reader. Announce `"skills section locked"` on the section's
+  live region when it settles.
+- **Reduced motion** skips all of it: restore every leaf's `dataset.txt`, swap
+  the panes, done. Same end state, no dip, no scramble.
+
+### 7. Verification
+
+- Bypass on, bypass off — every bypass-only section relocks, no pill ever changes
+  width mid-scramble, no row rewraps.
+- Solve section 1, bypass on, bypass off — section 1 stays open and unscrambled.
+- Scrub the timeline by hand at 0.42 / 0.50 / 0.58 — real geometry at all three,
+  never a stand-in shape.
+- Relock twice in a row without reloading — `dataset.txt` still intact, no
+  glyphs baked into the DOM.
+- Rotate a phone mid-relock — finishes correctly, no snap-back.
+- Reduced motion, and JS disabled — both readable, both correct.
+- Screenshot diff of the settled `locked` state against phase 4's — identical.
+
 
 ---
 

@@ -24,7 +24,8 @@ Current structure:
 **Visual references in the repo root:**
 - `wireframe.svg` — simplified wireframe of the target layout in both themes. Proportion and hierarchy only; type, colour, and spacing are still open.
 - `LOCK_SPEC.md` — **authoritative** spec for the hero padlock: form, size, material, the `--p` scroll-lighting model, and the unlock animation. Where it conflicts with §5 below, LOCK_SPEC.md wins.
-- `lock-combined-prototype.html` — **start here.** All three systems working together (chrome material, scroll light sweep, unlock) in both themes, verified rendering.
+- `ANIMATIONS.md` — **authoritative** spec for the section-unlock animation: the redraw-scanline block swap and the scramble-decrypt text reveal, and how they compose into one motion.
+- `lock-combined-prototype.html` — **start here** for the hero lock. All three systems working together (chrome material, scroll light sweep, unlock) in both themes, verified rendering.
 - `lock-unlock-prototype.html` — the original Three.js unlock prototype.
 - `lock-light-prototype.html` — working prototype of the **scroll-driven lighting model**, and the required no-WebGL fallback path.
 
