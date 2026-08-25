@@ -94,7 +94,7 @@ export function initCtf() {
     }
 
     if (bypassBtn) {
-      bypassBtn.textContent = bypass ? '[ enable puzzles ]' : '[ skip puzzles ]';
+      bypassBtn.textContent = bypass ? '[ enable CTFs ]' : '[ skip CTFs ]';
       bypassBtn.setAttribute('aria-pressed', String(bypass));
     }
 

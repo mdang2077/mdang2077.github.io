@@ -9,15 +9,17 @@
 <script>
   /* The one inline script on the page. It must run before first paint,
      so it is blocking and deliberately tiny: resolve the theme from an
-     explicit choice, else the OS preference, and stamp it on <html>.
-     Any failure falls back to dark rather than leaving it unset. */
+     explicit choice, else dark, and stamp it on <html>.
+
+     The OS preference is deliberately not consulted. This is a dark
+     terminal by design — the CTF console, the amber warn state and the
+     hero lock's studio lighting are all authored for it — so a visitor
+     on a light desktop should still land in the dark room and opt out
+     by hand. Any failure falls back to dark too. */
   (function () {
     try {
       var t = localStorage.getItem('theme');
-      if (t !== 'dark' && t !== 'light') {
-        t = matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
-      }
-      document.documentElement.dataset.theme = t;
+      document.documentElement.dataset.theme = t === 'light' ? 'light' : 'dark';
     } catch (e) {
       document.documentElement.dataset.theme = 'dark';
     }
@@ -159,10 +161,10 @@
     <div class="ctf-explainer">
       <p>This site is a little different. To explore each section, you'll need to solve a mini puzzle — these are called <strong>Capture The Flag (CTF)</strong> challenges. CTFs are cybersecurity puzzles involving cryptography, reverse engineering, forensics, and more to find a hidden "flag" or answer.</p>
       <p>Each section below is locked behind one. They're beginner-friendly, so give them a shot!</p>
-      <p>If you just want to see my info without the puzzles, that's totally fine too!</p>
+      <p>If you just want to see my info without the CTFs, that's totally fine too!</p>
       <div class="bypass-row">
         <span class="bypass-label" id="bypass-label">BYPASS:</span>
-        <button class="toggle-btn" type="button" data-bypass aria-pressed="false" aria-describedby="bypass-label">[ skip puzzles ]</button>
+        <button class="toggle-btn" type="button" data-bypass aria-pressed="false" aria-describedby="bypass-label">[ skip CTFs ]</button>
       </div>
     </div>
 
