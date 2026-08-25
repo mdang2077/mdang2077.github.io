@@ -119,22 +119,28 @@
 .hero-band {
   position: relative;
   z-index: var(--z-content);
-  /* One token, two sizes: the lock is 1.5x this and both derive
-     from it, so the ratio survives every breakpoint. */
+  /* One token, two sizes: the type size, and the lock derived from
+     it, so the ratio survives every breakpoint. `--lock-h` lives
+     here rather than on the stage because the band's headroom and
+     the pin rail's offset both have to read it. */
   --hero-size: clamp(var(--display-md), 9vw, 92px);
+  --lock-h: calc(2.25 * var(--hero-size));
 
-  /* The rig translates up to centre the lock's body on the type,
+  /* The stage translates up to centre the lock's body on the type,
      and a transform does not affect layout — so the band buys the
      headroom back as padding, derived from the same token. */
   padding:
-    calc(0.25 * 1.5 * var(--hero-size) + var(--space-8))
+    calc(0.25 * var(--lock-h) + var(--space-8))
     var(--space-7)
     var(--space-8);
   border-bottom: var(--border-hair) solid var(--border);
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: var(--space-4);
+
+  /* With the pin rail's dead space cancelled below, this is the
+     real measured distance from the lock's foot to the pins. */
+  gap: var(--space-7);
 
   /* Visible, not hidden: the shackle's top would be clipped the
      moment the rig translates up. Nothing needed containing here —
@@ -202,8 +208,6 @@
    constant. If the camera's fov or z ever changes, 0.77 has to be
    re-measured in the same sitting. */
 .lock-stage {
-  --lock-h: calc(1.5 * var(--hero-size));
-
   position: relative;
   display: block;
   grid-column: 2;
@@ -213,10 +217,25 @@
 
   /* Centre the lock's *body* on the type, not the box: the shackle
      makes the object top-heavy and box-centring leaves it floating
-     above the letterforms. 0.37em up puts the body centre on the
-     type centre; 0.055em back down is the VT323 cap-height nudge
-     from phase 3. */
-  transform: translateY(calc(-0.315 * var(--hero-size)));
+     above the letterforms. The body's centre sits 0.2467 of the
+     lock's height below the object's own centre; 0.055em back down
+     is the VT323 cap-height nudge from phase 3. Stated against
+     --lock-h rather than --hero-size so resizing the lock cannot
+     silently un-centre it. */
+  transform: translateY(calc(0.055 * var(--hero-size) - 0.2467 * var(--lock-h)));
+
+  /* Two pieces of dead space sit between the lock's foot and the
+     pins, and a gap token can see neither: the box is square while
+     the lock fills only 77% of it, and the stage is translated up
+     on top of that. Together they measured 50px on a 16px gap.
+     Cancelling them here is what makes .hero-band's gap mean the
+     distance you actually see.
+
+     It belongs on the stage rather than on the pin rail so that it
+     disappears with the stage — a `display: none` element applies
+     no margins, so the collapsed lockup needs no special case and
+     no `:has()`. */
+  margin-bottom: calc(0.055 * var(--hero-size) - 0.396 * var(--lock-h));
 }
 
 /* The reserved box, held from first paint so the canvas arriving
@@ -422,8 +441,14 @@
    The lockup is the one thing on the page allowed to dominate a
    phone screen; the pins stay under it and shrink with it. */
 @media (max-width: 768px) {
+  /* Side padding tightens, but the top still has to buy back the
+     stage's translate — a flat value here let the shackle poke
+     above the band and under the sticky topbar at 768px. */
   .hero-band {
-    padding: var(--space-7) var(--space-5) var(--space-6);
+    padding:
+      calc(0.25 * var(--lock-h) + var(--space-5))
+      var(--space-5)
+      var(--space-6);
   }
 
   .lockup {
