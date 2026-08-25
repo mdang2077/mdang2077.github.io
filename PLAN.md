@@ -242,14 +242,32 @@ rim.position.x    =  6 - p * 12;
 shineTex.offset.x = (0.5 - p) * 1.7;   // 1.7 carries the band fully off both edges
 ```
 
-**The ScrollTrigger range was corrected, and the correction is right.**
-`LOCK_SPEC.md` §4 says `top bottom -> bottom top`, which suits an element part
-way down the page. The hero is the *first* thing on the page, so that range is
-~70% consumed before the visitor scrolls a pixel and they would only ever see
-the tail of the sweep. The code measures from the band's own top instead
-(`start: 'top top'`, `end: 'bottom top'`), so the full pass happens across the
-hero's exit and runs backwards on the way up. **No pin, no sticky** — the page
+**The ScrollTrigger range is the lock's own life on screen**, and it took two
+passes to get there. `LOCK_SPEC.md` §4 says `top bottom -> bottom top`, which
+suits an element part way down the page; the hero is the *first* thing on the
+page, so that range is ~70% consumed before the visitor scrolls a pixel and only
+the tail of the sweep is ever visible. Measuring from the band's own top fixed
+that but left a subtler version of the same problem — the sweep did not begin
+until the band cleared the topbar, and it finished long after the lock itself had
+gone, so the light barely moved while there was any metal to move across.
+
+```js
+start: 0,                      // the literal top of the page
+end: 'bottom-=11.5% top',      // the lock's foot leaving the viewport
+```
+
+`0` is a scroll position, not a keyword: the light is hard left before the
+visitor has touched anything. The `-=11.5%` is the slack under the lock inside
+its own box — the box is square and the lock fills 77% of it, so `(1 - 0.77) / 2`
+of its height sits below the lock's foot, and trimming it lands the end of the
+sweep on metal rather than on empty canvas. Measured: `end` comes out at exactly
+the lock's visible bottom, 342px at 1440 and 190px at 375, with progress linear
+across the range and reversing on the way up. **No pin, no sticky** — the page
 scrolls at normal speed throughout.
+
+This is also what `--hero-air` buys: a taller band pushes the lock further down
+the page, so the lock's foot leaves the viewport later and the sweep has further
+to run.
 
 **Idle** is a raised cosine starting and ending exactly on the scrub's resting
 value, so the handover has nothing to jump from. First scroll input kills it

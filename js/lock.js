@@ -42,10 +42,6 @@ export function initLock({ prefersReducedMotion = false, gsap = null } = {}) {
   const stage = document.querySelector('[data-lock-stage]');
   if (!stage) return { setState: noop, destroy: noop };
 
-  /* The band, not the lock, is what the sweep is measured against.
-     See the trigger below. */
-  const hero = stage.closest('.hero-band') || stage;
-
   let state = 'locked';
   let scene = null;
 
@@ -120,20 +116,33 @@ export function initLock({ prefersReducedMotion = false, gsap = null } = {}) {
         p: 1,
         ease: 'none',
         scrollTrigger: {
-          trigger: hero,
-          /* LOCK_SPEC §3 has `top bottom` -> `bottom top`, which is
-             right for an element somewhere down the page and wrong
-             for this one. The hero is the first thing on the page,
-             so that range is already ~70% consumed before the
-             visitor has scrolled a pixel — they would only ever see
-             the tail of the sweep.
+          trigger: stage,
+          /* The range is the lock's own life on screen, not an
+             element's box.
 
-             Measuring from the band's own top instead means the
-             full left-to-right pass happens over the hero's exit,
-             and runs right-to-left on the way back up, which is
-             what the scrub does for free. */
-          start: 'top top',
-          end: 'bottom top',
+             `LOCK_SPEC.md` §3 has `top bottom -> bottom top`, which
+             suits an element part way down the page. The hero is
+             the *first* thing on the page, so that range is ~70%
+             consumed before the visitor scrolls a pixel and only
+             the tail of the sweep is ever visible. Measuring from
+             the band's top instead fixed that but left a subtler
+             version of it: the sweep did not begin until the band
+             cleared the topbar, and it finished long after the lock
+             itself had gone.
+
+             So: `0` is the literal top of the page — the light
+             starts hard left before the visitor has touched
+             anything — and the end is the lock's foot passing out
+             of the viewport. The scrub runs it backwards on the way
+             up for free.
+
+             The `-=11.5%` is the slack under the lock inside its
+             own box. The box is square and the lock fills 77% of
+             it, so (1 - 0.77) / 2 of the box's height sits below
+             the lock's foot; trimming it lands the end of the sweep
+             on the metal rather than on empty canvas. */
+          start: 0,
+          end: 'bottom-=11.5% top',
           /* Smoothing only. No pin, no sticky: the page scrolls at
              normal speed throughout. Hijacking scroll to play an
              animation is the failure mode this design avoids. */
