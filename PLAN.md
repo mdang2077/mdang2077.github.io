@@ -1062,7 +1062,7 @@ conclusion, both correct. Do not collapse the two.
 Bypass off currently jumps bypass-only sections shut instantly (§4c, third
 bullet). That stays right in spirit — going back is not a payoff — but instant
 is not the same as *free*, and a section vanishing between frames reads as a
-bug rather than a decision. ~900ms, and the reverse direction does the work of
+bug rather than a decision. ~1.4s, and the reverse direction does the work of
 saying "this is being undone."
 
 Sections the visitor actually **solved never relock.** Only sections open purely
@@ -1088,9 +1088,12 @@ is cloned, no intermediate element exists.
 
 | t | Beat |
 |---|---|
-| 0.00–0.42 | every `.tg` and `.blk-t` in the content pane encrypts, right → left |
-| 0.43–0.57 | blur-dip covers the pane exchange; stage height retimes here |
-| 0.58–1.00 | every text leaf in the locked pane decrypts in, right → left |
+| 0.000–0.630 | every `.tg` and `.blk-t` in the content pane encrypts, right → left |
+| 0.639–0.765 | blur-dip covers the pane exchange; stage height retimes here |
+| 0.774–1.404 | every text leaf in the locked pane decrypts in, right → left |
+
+Seconds, not fractions of a total, because the phases do not scale together —
+see §8g. The two scrambles carry the length; the dip is fixed.
 
 **Three things carry it. All three are load-bearing:**
 
@@ -1101,9 +1104,10 @@ is cloned, no intermediate element exists.
 - **Right → left.** Phase 5's beam sweeps down and its decrypt runs left → right.
   Running the relock the other way is what makes it read as *undoing* rather than
   as a second, unrelated event. Both axes reverse or neither does.
-- **The dip is short and covers the swap frame.** ~140ms of `blur(7px)` plus a
+- **The dip is short and covers the swap frame.** 126ms of `blur(7px)` plus a
   45% dim, peaking exactly where the two panes exchange. Longer and it reads as
-  a page load; absent and the pill grid visibly becomes a card.
+  a page load; absent and the pill grid visibly becomes a card. It is the one
+  phase that does not grow when the effect is lengthened.
 
 ```js
 // length-preserving, eats inward from the right
@@ -1155,7 +1159,7 @@ The busy set still applies: a section already relocking does not start again.
 - Reduced motion, and JS disabled — both readable, both correct.
 - Screenshot diff of the settled `locked` state against phase 4's — identical.
 
-### 8. Build notes — what shipped, and the five places it deviates
+### 8. Build notes — what shipped, and the seven places it deviates
 
 All of §7 verified against headless Chrome: 38 assertions covering the
 invariants above, plus a hand scrub at 0.42 / 0.50 / 0.58 that measures the
@@ -1206,7 +1210,19 @@ is what lets the snap pass as the encryption finishing rather than as the
 reveal it interrupted completing in one frame. ~510ms rather than ~900: less
 was shown, so there is less to undo.
 
-**f. Nothing is staggered.** Bypass *on* staggers its three sweeps; bypass off
+**f. Lengthened to 1.4s after watching it, and only in the scrambles.** The
+first cut ran 900ms — 378ms of encrypt, the dip, 378ms of decrypt — and read as
+too quick to follow. Each scramble is now 630ms and the dip is untouched at
+126ms, because scaling everything by the same factor would have taken the dip
+to 196ms and §4's third bullet is explicit that the dip's length is what keeps
+the exchange from reading as a page load.
+
+That is what moved the timings off fractions of a total and onto seconds. A
+normalised table only stays readable while every phase scales together, and
+these do not: `SCRAMBLE`, `DIP` and `SEAM` are the three real numbers, and
+every position in the timeline is derived from them.
+
+**g. Nothing is staggered.** Bypass *on* staggers its three sweeps; bypass off
 runs all three relocks together. §5b.3 is the reason — both rejected prototypes
 staggered element exits and both had a dead frame where the old content had
 left and the new had not arrived. The dip covers one seam per section; three

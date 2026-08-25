@@ -95,29 +95,35 @@ const BYPASS_STAGGER = 0.08;
 const SAFETY = (SWEEP + BEAM_OUT + 1) * 1000;
 
 /* ── THE RELOCK, `PLAN.md` §5b ───────────────────────────────
-   Bypass off, and only bypass off. Every fraction below is a
-   fraction of RELOCK, so the beat table in the plan can be read
-   straight off these names:
+   Bypass off, and only bypass off.
 
-     0.00 - 0.42   the content pane encrypts, right -> left
-     0.43 - 0.57   the blur dip, with the pane swap and the height
-                   change buried inside it
-     0.58 - 1.00   the locked pane decrypts in, right -> left
+     encrypt   the content pane, right -> left
+     seam      one beat, so the dip starts after the encrypt lands
+     dip       blur and dim, with the pane swap and the height
+               change buried in the middle of it
+     seam
+     decrypt   the challenge card back in, right -> left
 
-   Right -> left is load-bearing. The unlock beam sweeps down and
-   its decrypt ran left -> right; running this one the other way is
-   what makes it read as the first one being undone rather than as
-   a second, unrelated event. Both axes reverse or neither does. */
-const RELOCK = 0.9;
-const OUT_END = 0.42;
-const DIP_IN = 0.43;
-const SWAP = 0.5;
-const DIP_OUT = 0.57;
-const IN_START = 0.58;
+   Seconds rather than fractions of a total, because the phases do
+   not scale together. The dip's length is load-bearing in a way
+   the scrambles' is not: much longer than this and the exchange
+   reads as a page load rather than as a blink. So lengthening the
+   effect lengthens the two scrambles and leaves the dip alone.
 
-/* The dip is ~126ms of this, peaking exactly on the swap frame.
-   Longer and it reads as a page load; absent and the pill grid is
-   visibly seen becoming a challenge card. */
+   Right -> left is load-bearing too. The unlock beam sweeps down
+   and its decrypt ran left -> right; running this one the other
+   way is what makes it read as the first one being undone rather
+   than as a second, unrelated event. Both axes reverse or neither
+   does. */
+const SCRAMBLE = 0.63;
+const DIP = 0.126;
+const SEAM = 0.009;
+
+const DIP_AT = SCRAMBLE + SEAM;
+const SWAP_AT = DIP_AT + DIP / 2;
+const DECRYPT_AT = DIP_AT + DIP + SEAM;
+const RELOCK = DECRYPT_AT + SCRAMBLE;
+
 const DIP_BLUR = 7;
 const DIP_DIM = 0.45;
 
@@ -537,7 +543,7 @@ export function initReveal({ gsap = null, prefersReducedMotion = false } = {}) {
         out,
         {
           v: 1,
-          duration: RELOCK * OUT_END,
+          duration: SCRAMBLE,
           ease: 'none',
           onUpdate: () => outLeaves.forEach((t) => scrambleOut(t, out.v)),
         },
@@ -547,21 +553,21 @@ export function initReveal({ gsap = null, prefersReducedMotion = false } = {}) {
         dip,
         {
           v: 1,
-          duration: RELOCK * (SWAP - DIP_IN),
+          duration: DIP / 2,
           ease: 'power2.in',
           onUpdate: paintDip,
         },
-        RELOCK * DIP_IN,
+        DIP_AT,
       )
       .to(
         dip,
         {
           v: 0,
-          duration: RELOCK * (DIP_OUT - SWAP),
+          duration: DIP / 2,
           ease: 'power2.out',
           onUpdate: paintDip,
         },
-        RELOCK * SWAP,
+        SWAP_AT,
       )
       /* Height and swap both inside the dip, so §4b still holds:
          the stage carries an inline height only while it is
@@ -570,10 +576,10 @@ export function initReveal({ gsap = null, prefersReducedMotion = false } = {}) {
         stage,
         {
           height: hL,
-          duration: RELOCK * (DIP_OUT - DIP_IN),
+          duration: DIP,
           ease: 'power2.inOut',
         },
-        RELOCK * DIP_IN,
+        DIP_AT,
       )
       .call(
         () => {
@@ -581,9 +587,9 @@ export function initReveal({ gsap = null, prefersReducedMotion = false } = {}) {
           locked.hidden = false;
         },
         null,
-        RELOCK * SWAP,
+        SWAP_AT,
       )
-      /* The swapped-in pane holds at fully glyphed for ~70ms before
+      /* The swapped-in pane holds fully glyphed for ~72ms before
          it starts resolving. This tween's only job is to keep
          re-rolling those glyphs across that gap: frozen ciphertext
          under a clearing blur looks like a dropped frame. */
@@ -591,24 +597,24 @@ export function initReveal({ gsap = null, prefersReducedMotion = false } = {}) {
         churn,
         {
           v: 1,
-          duration: RELOCK * (IN_START - SWAP),
+          duration: DECRYPT_AT - SWAP_AT,
           ease: 'none',
           onUpdate: () => inLeaves.forEach((t) => scrambleIn(t, 0)),
         },
-        RELOCK * SWAP,
+        SWAP_AT,
       )
       .to(
         inn,
         {
           v: 1,
-          duration: RELOCK * (1 - IN_START),
+          duration: SCRAMBLE,
           ease: 'none',
           onUpdate: () => inLeaves.forEach((t) => scrambleIn(t, inn.v)),
         },
-        RELOCK * IN_START,
+        DECRYPT_AT,
       );
 
-    if (from) item.tl.time(RELOCK * from);
+    if (from) item.tl.time(from);
 
     /* Same guarantee the sweep makes, and it matters more here:
        a relock stopped by a backgrounded tab would leave glyphs
@@ -674,7 +680,7 @@ export function initReveal({ gsap = null, prefersReducedMotion = false } = {}) {
 
       if (relocking && animate) {
         stop(item);
-        relock(item, midSweep ? DIP_IN : 0);
+        relock(item, midSweep ? DIP_AT : 0);
         return;
       }
 
