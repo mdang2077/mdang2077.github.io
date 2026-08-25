@@ -7,6 +7,7 @@ import { initTheme } from './theme.js';
 import { initHud } from './hud.js';
 import { initLock } from './lock.js';
 import { initAnimations } from './animations.js';
+import { initReveal } from './reveal.js';
 
 /* Fallback gate for engines without `@media (scripting)`. Modern
    engines have already hidden the reveals before first paint. */
@@ -48,4 +49,7 @@ export const lock = initLock({ prefersReducedMotion, gsap });
 
 initAnimations({ lock, prefersReducedMotion });
 initHud({ gsap, prefersReducedMotion });
+/* Before initCtf, like the other two, so it sees `reason: 'init'`
+   and can settle its stages on the state the page loads in. */
+initReveal({ gsap, prefersReducedMotion });
 initCtf();

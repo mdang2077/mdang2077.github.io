@@ -1142,3 +1142,78 @@
 :root .reveal.is-visible { display: block; }
 
 .challenge.is-hidden { display: none; }
+
+/* ── THE UNLOCK STAGE ────────────────────────────────────────
+   Phase 5. Two panes stacked in one clipping context so a beam can
+   sweep the boundary between them — content above it, challenge
+   below — instead of the block changing on a single frame.
+
+   Everything here is gated on `[data-stage-ready]`, which
+   js/reveal.js sets only once it has measured both panes. That
+   gate is the no-JS contract: absolutely-positioned panes give the
+   stage no height of its own, so a static render would collapse to
+   a blank strip where the section should be. Un-ready, the stage
+   is a plain wrapper and both panes are in normal flow, which is
+   byte-for-byte the layout that existed before it. */
+.stage {
+  position: relative;
+}
+
+/* Out of flow only while the beam is running. Settled, the visible
+   pane is an ordinary block and the stage takes its height from
+   it — see the deviation note at the top of js/reveal.js. The
+   clipping goes on the same switch: `overflow: hidden` on a
+   settled stage would crop a focus ring on the answer input. */
+.stage[data-sweeping] {
+  overflow: hidden;
+}
+
+.stage[data-sweeping] > .pane {
+  position: absolute;
+  inset: 0 auto auto 0;
+  width: 100%;
+}
+
+/* The pane is deliberately given no `display` of its own — not
+   even `flow-root`, which was the obvious way to keep a child's
+   bottom margin from escaping it.
+
+   Two reasons. The margin has to escape: the last `.skills-block`
+   in section 1 has one, and it collapsed out through `.reveal` and
+   out of `.section` before this wrapper existed. Containing it
+   made the section 22px taller than the layout this phase promised
+   not to touch. And it does not need containing anyway — an
+   absolutely positioned box is already a block formatting context,
+   so the pane contains its margins for free during the only part
+   of its life that is measured against a pixel height. The pane
+   also stays free of an author `display`, which is what lets the
+   UA stylesheet's `[hidden] { display: none }` do its job. */
+
+/* Once the stage owns visibility, ctf.js's display classes must
+   stop deciding it: the pane is the thing shown or hidden, and a
+   `display: none` inside a visible pane would leave it measuring
+   zero. Both rules beat their phase-3 counterparts on specificity,
+   so no `!important` is involved. */
+.stage[data-stage-ready] .challenge,
+.stage[data-stage-ready] .reveal {
+  display: block;
+}
+
+/* The beam. Wider than the stage and bled past both edges so its
+   soft ends are never clipped into hard stops, and above both
+   panes so it reads as passing over the block rather than through
+   it. Colour is the solved accent every other "unlocked" signal on
+   the page uses — a token, never a hex, because it has to differ
+   between the two themes. */
+.beam {
+  position: absolute;
+  left: -3%;
+  width: 106%;
+  height: 2px;
+  top: 0;
+  opacity: 0;
+  z-index: 6;
+  pointer-events: none;
+  background: linear-gradient(90deg, transparent, var(--success), transparent);
+  box-shadow: 0 0 12px 3px var(--beam-glow);
+}

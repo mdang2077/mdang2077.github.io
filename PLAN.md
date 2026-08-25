@@ -11,9 +11,10 @@ committable, deployable site. Branch: `feat/v3-motion`. Never commit to `main`.
 | 1 | Restructure + tokens, zero visual change | **done** |
 | 2 | Dark/light theme toggle | **done** |
 | 3 | Hero lock — WebGL padlock, scroll shine, 3D unlock | **done** |
-| 4 | Unlock system — run log + pin rail + hero lock + bypass relock | todo |
-| 5 | Approved extras | todo |
-| 6 | Polish + full audit | todo |
+| 4 | Unlock system — run log + pin rail + hero lock + bypass relock | **done** |
+| 5 | Section unlock — redraw scanline (`ANIMATIONS.md` effect A, then B) | **done** |
+| 6 | Approved extras | todo |
+| 7 | Polish + full audit | todo |
 
 ## File tree
 
@@ -36,6 +37,7 @@ js/
   ctf.js              challenge logic, unlock state, progress, bypass
   theme.js            dark/light toggle, persistence, view-transition reveal
   animations.js       phase 4 — GSAP timelines + ScrollTrigger
+  reveal.js           phase 5 — section stage: scanline swap + scramble
   lock.js             orchestrator — capability check, scroll scalar, lock state machine
   lock3d.js           the Three.js hero lock scene
   hud.js              phase 3 markup / phase 4 behavior — run log + hero pins
@@ -461,7 +463,7 @@ plumbing already proven end to end.
 the inset fill in dark and 2.83:1 in light, and both the idle prompt and the
 count column are real text. They use `--text-muted` (5.20:1 / 4.66:1).
 `--text-dim` is still used by `.lock-icon.is-bypassed`, which has the same
-problem and predates this phase — **flagged for phase 6**.
+problem and predates this phase — **flagged for phase 7**.
 
 **On `animation-timeline: view()`.** Evaluated as the brief asked, not used.
 GSAP is loaded for phase 4 regardless, so the native path buys nothing.
@@ -589,6 +591,12 @@ nothing in it blocks reading the content that just appeared.
 | 6 | log line prints | console | types at 28ms/char | ~600ms, starts with beat 4 |
 | 7 | dot fills | `[data-dot]` | existing `is-done` | unchanged |
 
+**Beats 1 and 3 are superseded by phase 5** — the block swap becomes the redraw
+scanline of `ANIMATIONS.md` §1. Do not build them here, and do not load GSAP
+Flip: phase 5 replaces both with a `clip-path` proxy tween that needs no plugin.
+Phase 4 keeps the section reveal on today's display toggle and ships the other
+five beats. See phase 5 §1.
+
 **The flight (beat 4).** Clone the `[ unlocked ]` tag, `position: fixed`, tween
 from the source `getBoundingClientRect()` to the target pin's. Two tweens, not
 one: `x` linear, `y` on `power2.in`. That gives an arc for free — no MotionPath
@@ -692,8 +700,13 @@ Phase 4 adds choreography to plumbing that already works end to end.
    `data-solved`. Verify play and reverse in isolation before wiring bypass.~~
    **done** — the timeline itself already shipped in phase 3, inside
    `lock3d.js` where the meshes are; `animations.js` owns *when* it plays.
-4. Wire the bypass staggered run and the relock reverse.
-5. Reduced-motion pass over all four, then the spam-toggle pass.
+4. ~~Wire the bypass staggered run and the relock reverse.~~ **done** — the
+   `[!]` line prints, pins run left to right from 120ms in 90ms steps, and the
+   hero lock opens at 300ms. Off reverses: lock first, pins right to left, the
+   transient line fading before it leaves the DOM.
+5. ~~Reduced-motion pass over all four, then the spam-toggle pass.~~ **done** —
+   see §8 below. The bypass hold is skipped entirely under reduced motion: a
+   delay with no motion in it is a stall, not choreography.
 
 Each step ends deployable: an unfinished later step just means less motion, not
 a broken page.
@@ -782,7 +795,7 @@ nothing, which is correct.
 | Four reserved console lines look like dead air on first load | The resting `> awaiting input_` prompt plus blinking cursor makes the empty state intentional |
 | Three `aria-live` regions announcing one solve | Console is `aria-hidden`; the existing two regions are unchanged |
 | Pins and dots read as duplicated progress | Accepted for now — different scroll positions. Reassess on screen; cut the dots if it grates |
-| GSAP Flip pushes the bundle over budget | Flip is the only plugin beyond core + ScrollTrigger; measure at step 1 of phase 4 against the ~190KB headroom and fall back to a plain height-free crossfade if it is tight |
+| ~~GSAP Flip pushes the bundle over budget~~ | Resolved by phase 5: the block swap moves to a `clip-path` proxy tween. Flip is not loaded at all |
 
 ---
 
@@ -805,6 +818,165 @@ reduced-motion, JS-disabled, screenshot diff):
 - Reduced motion — all of the above, instant, same end states.
 - Reload after any of it — nothing persists, and the page comes back locked
   with the console at rest. (Solve state is intentionally not stored.)
+
+## Phase 5 — section unlock: the redraw scanline (Effect A)
+
+Spec: `ANIMATIONS.md` §1, §3, §4. That file is authoritative for the mechanism;
+this section is only about how it lands in *this* codebase and in what order.
+
+**Why it is its own phase and not a step of phase 4.** Phase 4 promised no new
+markup and no layout change — it adds behavior to plumbing phase 3 drew. The
+scanline breaks both promises: the challenge card and the revealed block have to
+become two absolutely-positioned panes inside a height-tweened stage, which is a
+structural change to all three sections. It also touches CSS that phase 4 never
+opens (`.reveal` / `.challenge.is-hidden`). Separate phase, separate commit,
+separate screenshot diff.
+
+---
+
+### 1. What this replaces
+
+Today the swap is a display toggle: `ctf.js` puts `.is-hidden` on
+`[data-challenge]` and `.is-visible` on `[data-reveal]`, and the block changes on
+one frame. That is the whole of the section-level reveal — there is currently no
+animation on it at all.
+
+**Phase 4 §2 beats 1 and 3 are superseded by this phase.** Do not build them:
+
+| Superseded | Was | Becomes |
+|---|---|---|
+| beat 1 — challenge collapses | GSAP Flip out, block flips into the space | the scanline's `locked` pane clipping closed downward |
+| beat 3 — content staggers in | `[data-reveal]` children `y:8 -> 0`, 60ms stagger | the scanline's `content` pane clipping open downward, text resolving in the beam's wake |
+
+Beats 2, 4, 5, 6 and 7 (lock tag flip, glyph flight, pin seat, log line, dot) are
+unaffected and already shipped — they animate the hero and the status strip, not
+the block.
+
+**This drops GSAP Flip from the plan entirely.** Flip was the only plugin beyond
+core + ScrollTrigger, and it was flagged as the bundle risk in §7. The scanline
+needs no plugin — a proxy tween and `clip-path`. Do not load Flip in phase 4 just
+to delete it here.
+
+---
+
+### 2. The stage
+
+New markup, per section — the one structural change in this phase:
+
+```html
+<div class="stage" data-stage>
+  <div class="pane pane-locked"  data-pane="locked">…existing form.challenge…</div>
+  <div class="pane pane-content" data-pane="content">…existing div.reveal…</div>
+</div>
+```
+
+`.stage { position:relative; overflow:hidden; }`, both panes
+`position:absolute; inset:0 0 auto 0; width:100%`. The stage carries the height;
+the panes never do.
+
+**The no-JS and reduced-motion renders must survive this wrapper.** `noscript.css`
+and the `:root:not([data-js="on"])` rules currently reach `.reveal` and
+`.challenge` directly; with the panes absolutely positioned by default, a page
+with no JS would collapse the stage to zero height. So absolute positioning is
+applied by JS at init (`data-js="on"` + a `data-stage-ready` flag), never in the
+static stylesheet. Static render = both panes in normal flow, bypassed and
+readable, exactly as today.
+
+---
+
+### 3. Where it hooks in
+
+New module `js/reveal.js`, owning the stage lifecycle: measure, state, timeline,
+resize. `animations.js` stays the hero/status-strip choreographer; it should not
+grow a second concern this size.
+
+It listens on the same `ctf:state` event everything else does, and branches on
+`reason`:
+
+| `reason` | Behaviour |
+|---|---|
+| `solve` | play the composed timeline once for `detail.index` |
+| `bypass` on | every still-locked section jumps to `unlocked`, no tween |
+| `bypass` off | sections not in `solved[]` jump back to `locked`, no tween |
+| `init` | apply state silently — never animates, same rule as everywhere else |
+
+**Ordering against the flight.** The glyph flight in `hud.js` clones
+`[data-lock]` and reads its `getBoundingClientRect()`. The scanline is tweening
+the stage's height at that moment, which moves everything below it — including,
+on sections 1 and 2, the hero pin the clone is flying *to*. §7's existing
+mitigation covers it: recompute the target rect on completion and snap. Verify it
+rather than assume it — this is the one place the two systems can collide.
+
+---
+
+### 4. Build order
+
+1. ~~Wrap the three sections in stages, JS-applied positioning, no animation
+   yet.~~ **done** — element-geometry diff against the previous commit is empty
+   in both the locked and the bypassed render.
+2. `measure()` per `ANIMATIONS.md` §4 — the temporarily-relative,
+   other-pane-hidden measurement. Log both heights, confirm they match the real
+   rendered heights before tweening anything.
+3. The scanline itself: proxy `v`, two `clip-path`s, the beam, the stage height.
+   Solve-only. This is the phase's deliverable.
+4. The three-state model and the resize guard (`BUSY`) — §4's "real bug". Wire
+   bypass on/off and returning-visitor to instant jumps.
+5. Reduced motion + a11y pass: `aria-busy` on the content pane during flight,
+   the existing `aria-live` announcements unchanged, no third live region.
+6. Effect B — the scramble decrypt, driven from step 3's `onUpdate`, per
+   `ANIMATIONS.md` §3.
+
+**On step 6.** The ask was Effect A. B is one step and stays last — but the hook
+for it goes in with step 3, because §3's hard rule is that A and B share one
+proxy. Running the scanline to completion and *then* starting a scramble is the
+one implementation the spec explicitly rules out, and retrofitting the shared
+proxy later means rewriting step 3. Leave the `targets` array and the
+`t.top < beamY` check in place even while `scramble()` is a no-op.
+
+---
+
+### 5. Landmines, carried from `ANIMATIONS.md` §4
+
+- **Measure before, not during.** Both panes measured with the pane temporarily
+  `position:relative` and the other `display:none`. Measuring while absolute
+  returns the wrong height.
+- **Resize must not clobber an in-flight transition.** Debounce ~180ms *and*
+  guard with a `BUSY` set keyed by section; add on timeline start, remove on
+  `onComplete` plus a safety timeout. Without both, rotating a phone mid-unlock
+  snaps the section back to locked.
+- **Three states, and two of them must be enterable with no animation.**
+  `locked`, `unlocking`, `unlocked`. Bypass and a returning visitor land on
+  `unlocked` instantly. Only a live solve animates. Same rule as `reason:'init'`.
+- **One node, one writer.** The scanline owns `clip-path`, stage `height`, and
+  the beam's `top`. The scramble owns `textContent` on leaf nodes only. Nothing
+  writes both.
+- **The beam colour is a token**, never a hex — it has to differ across themes.
+  Reuse the "solved" accent the badges and `.challenge-msg.is-ok` already use.
+- **Reduced motion is one guard checked once:** final text set directly, stage at
+  `hC`, locked pane hidden, content shown, no beam. Fully readable end state.
+
+---
+
+### 6. Verification for phase 5
+
+On top of the standing per-phase checks:
+
+- Solve each section — the beam sweeps once, the block is content above it and
+  challenge below it at every frame, and the height lands exactly on the
+  content's natural height with no jump on completion.
+- Solve section 1 while the page is scrolled so section 2 is visible — nothing
+  below shifts after the tween settles.
+- Resize / rotate mid-sweep — the section finishes correctly, does not snap back.
+- Bypass on from cold, bypass off — instant both ways, no beam, no partial clip
+  left on any pane (`clip-path` must be cleared, not left at `inset(0 0 0% 0)`).
+- Solve one, bypass on, bypass off — the solved section stays open and unclipped.
+- Reduced motion — every path above, instant, same end states, no beam in the DOM.
+- JS disabled — both panes in normal flow, everything readable, no stage collapse.
+- Keyboard-only — focus is never trapped inside a clipped pane; the content pane
+  must not be reachable while it is still clipped closed.
+- Screenshot diff of the settled `unlocked` state against phase 4's — identical.
+
+---
 
 ## Decisions carried from the brief (do not re-litigate)
 

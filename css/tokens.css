@@ -135,6 +135,11 @@
   --dark-amber:       #e6a817;
   --dark-amber-wash:  rgba(230, 168, 23, 0.12);
   --dark-amber-glow:  rgba(230, 168, 23, 0.2);
+  /* The unlock beam's halo. Stated as its own token rather than
+     mixed from --success at use time: the two themes want
+     different alphas, not one alpha over two colours. Dark takes
+     the wider, brighter bloom a CRT trace has on a black tube. */
+  --dark-beam-glow:   rgba(0, 255, 136, 0.4);
   --dark-danger-wash: rgba(255, 68, 68, 0.1);
 
   --dark-scanline:      rgba(0, 0, 0, 0.08);
@@ -193,6 +198,7 @@
   --light-amber:       #785709;
   --light-amber-wash:  rgba(120, 87, 9, 0.1);
   --light-amber-glow:  rgba(120, 87, 9, 0.18);
+  --light-beam-glow:   rgba(10, 107, 63, 0.28);
   --light-danger-wash: rgba(176, 32, 32, 0.1);
 
   --light-scanline:      rgba(0, 0, 0, 0.035);
@@ -246,6 +252,7 @@
   --amber:       var(--dark-amber);
   --amber-wash:  var(--dark-amber-wash);
   --amber-glow:  var(--dark-amber-glow);
+  --beam-glow:   var(--dark-beam-glow);
   --danger-wash: var(--dark-danger-wash);
 
   --lock-shell:           var(--dark-lock-shell);
@@ -378,6 +385,7 @@
   --amber:       var(--light-amber);
   --amber-wash:  var(--light-amber-wash);
   --amber-glow:  var(--light-amber-glow);
+  --beam-glow:   var(--light-beam-glow);
   --danger-wash: var(--light-danger-wash);
 
   --lock-shell:           var(--light-lock-shell);

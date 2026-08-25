@@ -199,51 +199,69 @@
           <span class="lock-badge-label" data-lock>[ locked ]</span>
         </span>
       </div>
-      <form class="challenge" data-challenge novalidate>
-        <p class="challenge-label">// challenge_01 :: cryptography</p>
-        <p class="challenge-desc">Decode this Base64-encoded string to find the flag:</p>
-        <p class="challenge-code">U2VjdXJpdHkgaXMgY29vbA==</p>
-        <p class="challenge-hint">hint: in your terminal, try: echo "U2VjdXJpdHkgaXMgY29vbA==" | base64 --decode</p>
-        <div class="input-row">
-          <label class="visually-hidden" for="answer-1">Answer for challenge 1</label>
-          <input class="challenge-input" id="answer-1" data-answer type="text" placeholder="enter decoded phrase..." autocomplete="off" spellcheck="false">
-          <button class="submit-btn" type="submit">submit &gt;</button>
+      <!-- The unlock stage. Both panes are wrapped, not merely
+           adjacent, because js/reveal.js sweeps a beam down the
+           boundary between them: above it the block is already the
+           content, below it still the challenge. That needs the two
+           stacked in one clipping context.
+
+           They are NOT absolutely positioned here. With no JS the
+           stage has no height of its own and would collapse to
+           nothing; reveal.js sets `data-stage-ready` once it has
+           measured, and only then does the CSS take them out of
+           flow. Static render = both panes in normal flow, exactly
+           as before this wrapper existed. -->
+      <div class="stage" data-stage>
+        <div class="pane pane-locked" data-pane="locked">
+          <form class="challenge" data-challenge novalidate>
+            <p class="challenge-label">// challenge_01 :: cryptography</p>
+            <p class="challenge-desc">Decode this Base64-encoded string to find the flag:</p>
+            <p class="challenge-code">U2VjdXJpdHkgaXMgY29vbA==</p>
+            <p class="challenge-hint">hint: in your terminal, try: echo "U2VjdXJpdHkgaXMgY29vbA==" | base64 --decode</p>
+            <div class="input-row">
+              <label class="visually-hidden" for="answer-1">Answer for challenge 1</label>
+              <input class="challenge-input" id="answer-1" data-answer type="text" placeholder="enter decoded phrase..." autocomplete="off" spellcheck="false">
+              <button class="submit-btn" type="submit">submit &gt;</button>
+            </div>
+            <p class="challenge-msg" data-msg aria-live="polite"></p>
+          </form>
         </div>
-        <p class="challenge-msg" data-msg aria-live="polite"></p>
-      </form>
-      <div class="reveal" data-reveal>
-        <div class="skills-block">
-          <h3 class="skills-block-title">Languages</h3>
-          <div class="tags">
-            <span class="tag">Swift</span>
-            <span class="tag">Java</span>
-            <span class="tag">C</span>
-            <span class="tag">Python</span>
-            <span class="tag">SQL</span>
-            <span class="tag">Bash</span>
-          </div>
-        </div>
-        <div class="skills-block">
-          <h3 class="skills-block-title">Tools &amp; Frameworks</h3>
-          <div class="tags">
-            <span class="tag">Wireshark</span>
-            <span class="tag">Xcode</span>
-            <span class="tag">Firebase</span>
-            <span class="tag">OpenSSL</span>
-            <span class="tag">Git</span>
-            <span class="tag">Linux CLI</span>
-            <span class="tag">Firebase Cloud Messaging Push Notifications</span>
-          </div>
-        </div>
-        <div class="skills-block">
-          <h3 class="skills-block-title">Security</h3>
-          <div class="tags">
-            <span class="tag">Web Exploitation</span>
-            <span class="tag">Prompt Injection</span>
-            <span class="tag">Cryptography</span>
-            <span class="tag">Reverse Engineering</span>
-            <span class="tag">Forensics</span>
-            <span class="tag">Binary Exploitation</span>
+        <div class="pane pane-content" data-pane="content">
+          <div class="reveal" data-reveal>
+            <div class="skills-block">
+              <h3 class="skills-block-title">Languages</h3>
+              <div class="tags">
+                <span class="tag">Swift</span>
+                <span class="tag">Java</span>
+                <span class="tag">C</span>
+                <span class="tag">Python</span>
+                <span class="tag">SQL</span>
+                <span class="tag">Bash</span>
+              </div>
+            </div>
+            <div class="skills-block">
+              <h3 class="skills-block-title">Tools &amp; Frameworks</h3>
+              <div class="tags">
+                <span class="tag">Wireshark</span>
+                <span class="tag">Xcode</span>
+                <span class="tag">Firebase</span>
+                <span class="tag">OpenSSL</span>
+                <span class="tag">Git</span>
+                <span class="tag">Linux CLI</span>
+                <span class="tag">Firebase Cloud Messaging Push Notifications</span>
+              </div>
+            </div>
+            <div class="skills-block">
+              <h3 class="skills-block-title">Security</h3>
+              <div class="tags">
+                <span class="tag">Web Exploitation</span>
+                <span class="tag">Prompt Injection</span>
+                <span class="tag">Cryptography</span>
+                <span class="tag">Reverse Engineering</span>
+                <span class="tag">Forensics</span>
+                <span class="tag">Binary Exploitation</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -263,47 +281,65 @@
           <span class="lock-badge-label" data-lock>[ locked ]</span>
         </span>
       </div>
-      <form class="challenge" data-challenge novalidate>
-        <p class="challenge-label">// challenge_02 :: reverse engineering</p>
-        <p class="challenge-desc">This function has been obfuscated. What does it return when x = 2?</p>
-        <p class="challenge-code">f(x) = ((x &lt;&lt; 3) | (x &gt;&gt; 1)) &amp; 0xFF<br>x = 2</p>
-        <p class="challenge-hint">hint: evaluate left shift by 3, OR with right shift by 1, mask with 0xFF</p>
-        <div class="input-row">
-          <label class="visually-hidden" for="answer-2">Answer for challenge 2</label>
-          <input class="challenge-input" id="answer-2" data-answer type="text" placeholder="enter answer..." autocomplete="off" spellcheck="false">
-          <button class="submit-btn" type="submit">submit &gt;</button>
+      <!-- The unlock stage. Both panes are wrapped, not merely
+           adjacent, because js/reveal.js sweeps a beam down the
+           boundary between them: above it the block is already the
+           content, below it still the challenge. That needs the two
+           stacked in one clipping context.
+
+           They are NOT absolutely positioned here. With no JS the
+           stage has no height of its own and would collapse to
+           nothing; reveal.js sets `data-stage-ready` once it has
+           measured, and only then does the CSS take them out of
+           flow. Static render = both panes in normal flow, exactly
+           as before this wrapper existed. -->
+      <div class="stage" data-stage>
+        <div class="pane pane-locked" data-pane="locked">
+          <form class="challenge" data-challenge novalidate>
+            <p class="challenge-label">// challenge_02 :: reverse engineering</p>
+            <p class="challenge-desc">This function has been obfuscated. What does it return when x = 2?</p>
+            <p class="challenge-code">f(x) = ((x &lt;&lt; 3) | (x &gt;&gt; 1)) &amp; 0xFF<br>x = 2</p>
+            <p class="challenge-hint">hint: evaluate left shift by 3, OR with right shift by 1, mask with 0xFF</p>
+            <div class="input-row">
+              <label class="visually-hidden" for="answer-2">Answer for challenge 2</label>
+              <input class="challenge-input" id="answer-2" data-answer type="text" placeholder="enter answer..." autocomplete="off" spellcheck="false">
+              <button class="submit-btn" type="submit">submit &gt;</button>
+            </div>
+            <p class="challenge-msg" data-msg aria-live="polite"></p>
+          </form>
         </div>
-        <p class="challenge-msg" data-msg aria-live="polite"></p>
-      </form>
-      <div class="reveal" data-reveal>
-        <div class="projects-list">
-          <a class="project-card-link" href="https://github.com/mdang2077/SHA256_pwcracker" target="_blank" rel="noopener noreferrer">
-            <article class="project-card">
-              <div class="project-top">
-                <h3 class="project-name">SHA256_pwcracker</h3>
-                <div class="project-langs"><span class="lang-tag">C</span><span class="lang-tag">OpenSSL</span></div>
-              </div>
-              <p class="project-desc">Dictionary attack tool that cracks SHA256 hashes against rockyou.txt, detecting exact matches and variations including case permutations (2^n combinations) and leet-speak substitutions (a→@, e→3, o→0, i→1).</p>
-            </article>
-          </a>
-          <a class="project-card-link" href="https://github.com/mdang2077/Chat-Server" target="_blank" rel="noopener noreferrer">
-            <article class="project-card">
-              <div class="project-top">
-                <h3 class="project-name">HTTP Chat Server</h3>
-                <div class="project-langs"><span class="lang-tag">C</span></div>
-              </div>
-              <p class="project-desc">Built a lightweight HTTP server from scratch in C supporting real-time messaging with post, react, edit, and history endpoints — handling up to 100,000 messages over plain HTTP GET requests.</p>
-            </article>
-          </a>
-          <a class="project-card-link" href="https://github.com/mdang2077/Truce" target="_blank" rel="noopener noreferrer">
-            <article class="project-card">
-              <div class="project-top">
-                <h3 class="project-name">Truce</h3>
-                <div class="project-langs"><span class="lang-tag">Python</span><span class="lang-tag">IBM Bob</span><span class="lang-tag">OpenAPI</span></div>
-              </div>
-              <p class="project-desc">API contract drift detector that uses IBM watsonx to simultaneously scan frontend code, backend routes, and OpenAPI specs — automatically classifying mismatches by severity (breaking/medium/cosmetic) and generating complete fixes including code patches, contract tests, and PR summaries with team routing. Built for the IBM Spring 2026 Hackathon. 15x faster resolution vs. manual debugging.</p>
-            </article>
-          </a>
+        <div class="pane pane-content" data-pane="content">
+          <div class="reveal" data-reveal>
+            <div class="projects-list">
+              <a class="project-card-link" href="https://github.com/mdang2077/SHA256_pwcracker" target="_blank" rel="noopener noreferrer">
+                <article class="project-card">
+                  <div class="project-top">
+                    <h3 class="project-name">SHA256_pwcracker</h3>
+                    <div class="project-langs"><span class="lang-tag">C</span><span class="lang-tag">OpenSSL</span></div>
+                  </div>
+                  <p class="project-desc">Dictionary attack tool that cracks SHA256 hashes against rockyou.txt, detecting exact matches and variations including case permutations (2^n combinations) and leet-speak substitutions (a→@, e→3, o→0, i→1).</p>
+                </article>
+              </a>
+              <a class="project-card-link" href="https://github.com/mdang2077/Chat-Server" target="_blank" rel="noopener noreferrer">
+                <article class="project-card">
+                  <div class="project-top">
+                    <h3 class="project-name">HTTP Chat Server</h3>
+                    <div class="project-langs"><span class="lang-tag">C</span></div>
+                  </div>
+                  <p class="project-desc">Built a lightweight HTTP server from scratch in C supporting real-time messaging with post, react, edit, and history endpoints — handling up to 100,000 messages over plain HTTP GET requests.</p>
+                </article>
+              </a>
+              <a class="project-card-link" href="https://github.com/mdang2077/Truce" target="_blank" rel="noopener noreferrer">
+                <article class="project-card">
+                  <div class="project-top">
+                    <h3 class="project-name">Truce</h3>
+                    <div class="project-langs"><span class="lang-tag">Python</span><span class="lang-tag">IBM Bob</span><span class="lang-tag">OpenAPI</span></div>
+                  </div>
+                  <p class="project-desc">API contract drift detector that uses IBM watsonx to simultaneously scan frontend code, backend routes, and OpenAPI specs — automatically classifying mismatches by severity (breaking/medium/cosmetic) and generating complete fixes including code patches, contract tests, and PR summaries with team routing. Built for the IBM Spring 2026 Hackathon. 15x faster resolution vs. manual debugging.</p>
+                </article>
+              </a>
+            </div>
+          </div>
         </div>
       </div>
     </section>
@@ -322,22 +358,40 @@
           <span class="lock-badge-label" data-lock>[ locked ]</span>
         </span>
       </div>
-      <form class="challenge" data-challenge novalidate>
-        <p class="challenge-label">// challenge_03 :: forensics</p>
-        <p class="challenge-desc">Every file has a magic number — a sequence of bytes at the start that identifies its type. What file type has this header?</p>
-        <p class="challenge-code">89 50 4E 47 0D 0A 1A 0A</p>
-        <p class="challenge-hint">hint: open a .png in a hex editor and check the first 8 bytes</p>
-        <div class="input-row">
-          <label class="visually-hidden" for="answer-3">Answer for challenge 3</label>
-          <input class="challenge-input" id="answer-3" data-answer type="text" placeholder="enter file type..." autocomplete="off" spellcheck="false">
-          <button class="submit-btn" type="submit">submit &gt;</button>
+      <!-- The unlock stage. Both panes are wrapped, not merely
+           adjacent, because js/reveal.js sweeps a beam down the
+           boundary between them: above it the block is already the
+           content, below it still the challenge. That needs the two
+           stacked in one clipping context.
+
+           They are NOT absolutely positioned here. With no JS the
+           stage has no height of its own and would collapse to
+           nothing; reveal.js sets `data-stage-ready` once it has
+           measured, and only then does the CSS take them out of
+           flow. Static render = both panes in normal flow, exactly
+           as before this wrapper existed. -->
+      <div class="stage" data-stage>
+        <div class="pane pane-locked" data-pane="locked">
+          <form class="challenge" data-challenge novalidate>
+            <p class="challenge-label">// challenge_03 :: forensics</p>
+            <p class="challenge-desc">Every file has a magic number — a sequence of bytes at the start that identifies its type. What file type has this header?</p>
+            <p class="challenge-code">89 50 4E 47 0D 0A 1A 0A</p>
+            <p class="challenge-hint">hint: open a .png in a hex editor and check the first 8 bytes</p>
+            <div class="input-row">
+              <label class="visually-hidden" for="answer-3">Answer for challenge 3</label>
+              <input class="challenge-input" id="answer-3" data-answer type="text" placeholder="enter file type..." autocomplete="off" spellcheck="false">
+              <button class="submit-btn" type="submit">submit &gt;</button>
+            </div>
+            <p class="challenge-msg" data-msg aria-live="polite"></p>
+          </form>
         </div>
-        <p class="challenge-msg" data-msg aria-live="polite"></p>
-      </form>
-      <div class="reveal" data-reveal>
-        <div class="granted">
-          <p class="granted-label">// access_granted</p>
-          <p class="granted-body">congrats — you actually know your magic bytes. not bad for a visitor 👾</p>
+        <div class="pane pane-content" data-pane="content">
+          <div class="reveal" data-reveal>
+            <div class="granted">
+              <p class="granted-label">// access_granted</p>
+              <p class="granted-body">congrats — you actually know your magic bytes. not bad for a visitor 👾</p>
+            </div>
+          </div>
         </div>
       </div>
     </section>
