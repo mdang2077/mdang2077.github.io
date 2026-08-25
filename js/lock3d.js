@@ -55,11 +55,41 @@ const BODY_Y = -0.35;
 const BODY_TOP = BODY_Y + BH / 2;
 const ARC_Y = BODY_TOP + BW * 0.77 - ARC - TUBE;
 
-/* Beat 4's angle. The prototype's -1.9 rad (~109deg) puts the
-   shackle nearly perpendicular to camera, where it reads edge-on
-   as a thin rod rather than an open shackle. -1.2 (~69deg) is
-   unmistakable depth with the opening still legible. */
-const SWING = -1.2;
+/* Beat 4's angle: a full half-turn, clockwise seen from above.
+   Earlier passes stopped short (the prototype's -1.9 rad, then
+   -1.2) to avoid the edge-on pose around 90deg where the shackle
+   reads as a thin rod. Going all the way through it is the fix
+   rather than the problem — the pose is a moment in the middle of
+   a swing, and the lock lands with the shackle laid right open
+   across the body's other side.
+
+   A half-turn is also the widest the lock ever gets: the far leg
+   swings from -ARC to +3*ARC in the lock's own space, so the
+   silhouette grows past the square canvas on the right. SWING_PAN
+   is the exact compensation — half the width gained — tweened on
+   the same beat so the open lock ends up centred instead of
+   clipped. Retune one and the other is wrong. */
+const SWING = -Math.PI;
+
+/* Half the width the silhouette gains. Locked, the lock spans the
+   body: -BW/2 to +BW/2. Open, the far leg and its tube reach
+   3*ARC + TUBE on the right while the body's left edge has not
+   moved, so re-centring is that overhang minus the old right edge,
+   halved. At the camera's 35deg over 5.3 units the square canvas
+   is ~1.67 either side of centre; this lands the open lock's edges
+   at ~1.37, so it is framed rather than trimmed. */
+const SWING_PAN = -((3 * ARC + TUBE) - BW / 2) / 2;
+
+/* The pan's vertical twin, and needed for the same reason. The
+   shackle's crown sits at a fixed height whatever the swing does
+   — a Y-rotation cannot move it up or down — but its *projected*
+   height is not fixed: at the old 69deg the crown was rotated well
+   back in depth and perspective pulled it down the frame, and at a
+   half-turn it comes back to z=0 standing at full height. Measured
+   at the camera, that lands it a couple of pixels over the top of
+   the canvas. This is the shortfall, taken off the lock on the
+   same beat so the crown clears with a little room to spare. */
+const SWING_DROP = -0.07;
 
 const PIXEL_RATIO = () =>
   Math.min(window.devicePixelRatio || 1, window.innerWidth < 768 ? 1.5 : 2);
@@ -249,8 +279,17 @@ export function createLockScene({ THREE, gsap, stage, theme, prefersReducedMotio
     roughness: 0.92,
   });
 
+  /* Two groups, because two things move the lock and neither may
+     see the other's value. `bob` is the idle float, written raw
+     every frame by the render loop; `lock` inside it is the
+     unlock's to tween. Collapsing them back into one group puts
+     the render loop and the timeline on the same `position.y`,
+     which is rule 2 at the top of this file. */
+  const bob = new THREE.Group();
+  scene.add(bob);
+
   const lock = new THREE.Group();
-  scene.add(lock);
+  bob.add(lock);
 
   /* ── BODY — extruded rounded rect. The bevel is the bright
      chamfer line from the reference and is not optional. */
@@ -417,7 +456,12 @@ export function createLockScene({ THREE, gsap, stage, theme, prefersReducedMotio
   timeline
     .to(body.position, { y: BODY_Y - 0.04, duration: 0.07, yoyo: true, repeat: 1, ease: 'power1.inOut' }, 0)
     .to(pivot.position, { y: 0.4, duration: 0.3, ease: 'back.out(2.4)' }, 0.06)
-    .to(pivot.rotation, { y: SWING, duration: 0.6, ease: 'power3.out' }, 0.3);
+    .to(pivot.rotation, { y: SWING, duration: 0.6, ease: 'power3.out' }, 0.3)
+    /* Same start, duration and ease as the swing above: this is not
+       a move of its own, it is the swing's own growth taken off the
+       lock so the frame holds still around it. Any drift between
+       the two curves shows up as the lock sliding. */
+    .to(lock.position, { x: SWING_PAN, y: SWING_DROP, duration: 0.6, ease: 'power3.out' }, 0.3);
 
   /* ── THEME ──────────────────────────────────────────────────
      The environment has to be rebuilt, not just the lights: it
@@ -499,7 +543,7 @@ export function createLockScene({ THREE, gsap, stage, theme, prefersReducedMotio
 
     /* The only idle motion. The lock never spins. */
     if (!prefersReducedMotion) {
-      lock.position.y = Math.sin(performance.now() / 1400) * 0.02;
+      bob.position.y = Math.sin(performance.now() / 1400) * 0.02;
     }
 
     renderer.render(scene, camera);
