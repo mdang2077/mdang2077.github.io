@@ -510,10 +510,12 @@
 
 /* At rest the block reads as an idle console rather than dead
    air. The prompt is removed once the first line prints. */
- /* --text-muted, not --text-dim: dim measures 3.43:1 on the
-    inset fill in dark and 2.83:1 in light, and both of these are
-    real text. Hierarchy comes from the brighter accent and --text
-    columns beside them instead. */
+ /* --text-muted, and there is no dimmer step to reach for: the
+    --text-dim token this used to avoid measured 3.43:1 on the
+    inset fill in dark and 2.83:1 in light, and phase 7 deleted it
+    rather than leave a sub-AA colour in the system for someone to
+    find. This is real text. Hierarchy comes from the brighter
+    accent and --text columns beside it instead. */
 .run-log-line--idle {
   color: var(--text-muted);
 }
@@ -521,7 +523,6 @@
 .run-log-mark        { color: var(--accent); }
 .run-log-line--warn .run-log-mark,
 .run-log-line--warn  { color: var(--amber); }
-.run-log-name        { color: var(--text); }
 .run-log-count       { color: var(--text-muted); }
 
  /* A block *glyph*, not an inline-block box. A box with a
@@ -659,9 +660,10 @@
 
 /* .lock-icon / .unlock-icon are gone: the badge above owns these
    three states, on an attribute rather than a className, and the
-   bypassed state moved from --text-dim (3.43:1 dark, 2.83:1 light
-   — both below AA) to --amber, which the run console already uses
-   for the same idea. */
+   bypassed state moved from the old --text-dim (3.43:1 dark,
+   2.83:1 light — both below AA) to --amber, which the run console
+   already uses for the same idea. --text-dim itself is gone as of
+   phase 7; this was the last thing that had ever used it. */
 
 /* ── CTF EXPLAINER ───────────────────────────────────────── */
 .ctf-explainer {

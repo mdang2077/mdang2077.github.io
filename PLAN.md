@@ -1299,8 +1299,10 @@ of definitions in `tokens.css`.
   in `layout.css` and `components.css` is the real breakpoint. Delete
   the token and comment the literal.
 
-- **`--glow-sm`, `--space-11`, `--surface-3`, `--tracking-none`** —
-  plain leftovers.
+- **`--dur-instant`, `--glow-sm`, `--space-11`, `--surface-3`,
+  `--tracking-none`** — plain leftovers. `--glow-sm` was the only
+  consumer of `--glow-alpha-sm`, so that and its two theme values go
+  with it; `--glow-alpha-lg` and `--glow-alpha-md` stay, both live.
 
 - The topbar reads `v2.0 :: ctf_edition`. This is v3.
 

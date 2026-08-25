@@ -15,7 +15,6 @@
   --space-8:  40px;
   --space-9:  48px;
   --space-10: 56px;
-  --space-11: 72px;
 
   /* ── TYPE SCALE ────────────────────────────────────────── */
   /* mono (JetBrains Mono) */
@@ -25,13 +24,9 @@
   --text-sm:   12px;
   --text-base: 13px;
   --text-md:   14px;
-  --text-lg:   16px;   /* intermediate step, reserved for phase 3 */
-  --text-xl:   18px;   /* intermediate step, reserved for phase 3 */
   /* display (VT323) */
   --display-sm: 22px;
   --display-md: 28px;
-  --display-lg: 36px;  /* intermediate step, reserved for phase 3 */
-  --display-xl: 44px;
 
   --leading-tight:  1.1;
   --leading-snug:   1.5;
@@ -39,7 +34,6 @@
   --leading-loose:  1.8;
   --leading-relaxed: 1.9;
 
-  --tracking-none:  0;
   --tracking-sm:    0.5px;
   --tracking-md:    1px;
   --tracking-lg:    2px;
@@ -68,7 +62,6 @@
   --border-marker: 3px;
 
   /* ── MOTION ────────────────────────────────────────────── */
-  --dur-instant: 100ms;
   --dur-fast:    200ms;
   --dur-mid:     300ms;
   --dur-slow:    400ms;
@@ -77,11 +70,15 @@
   --dur-reveal:  450ms;   /* view-transition circular reveal */
   --dur-flash:   800ms;   /* unlock flash */
 
-  /* Phase 3/4 — the unlock system. GSAP-side eases (back.out,
-     power2.in) stay in JS: they have no CSS equivalent. */
-  --dur-flight:  520ms;   /* [ unlocked ] glyph -> hero pin */
-  --dur-seat:    180ms;   /* pin seating pop */
-  --dur-type:     28ms;   /* per character, run console */
+  /* Phase 3/4 — the unlock system's own timings are NOT here.
+     The glyph flight, the pin seat and the run console's per-character
+     rate are GSAP tweens; js/hud.js holds them as FLIGHT_DURATION,
+     SEAT_DURATION and TYPE_PER_CHAR, in seconds, and is the only
+     thing that reads them. They had copies here that nothing
+     referenced — one constant, two sources — so the copies went and
+     this pointer replaced them. Same rule as the GSAP-side eases
+     (back.out, power2.in), which stay in JS for want of a CSS
+     equivalent. */
 
   --ease-standard: ease;
   --ease-out:      cubic-bezier(0.22, 1, 0.36, 1);
@@ -114,7 +111,6 @@
   --dark-bg:             #080c0a;
   --dark-surface-1:      #0e1210;
   --dark-surface-2:      #131a16;
-  --dark-surface-3:      #1a2420;
   --dark-surface-inset:  #080c0a;
   --dark-surface-sunk:   rgba(14, 18, 16, 0.6);
   --dark-bg-glass:       rgba(8, 12, 10, 0.85);
@@ -124,7 +120,6 @@
 
   --dark-text:           #d4e8dc;
   --dark-text-muted:     #6b8a7c;
-  --dark-text-dim:       #666666;
 
   --dark-locked-h: 0;    --dark-locked-s: 100%;  --dark-locked-l: 60%;  /* #ff3333 */
   --dark-solved-h: 152;  --dark-solved-s: 100%;  --dark-solved-l: 50%;  /* #00ff88 */
@@ -166,7 +161,6 @@
 
   --dark-glow-alpha-lg: 0.15;
   --dark-glow-alpha-md: 0.08;
-  --dark-glow-alpha-sm: 0.04;
 
   /* ── LIGHT — "paper terminal" ───────────────────────────────
      Warm off-white ground with dark ink, not an inversion. The
@@ -177,7 +171,6 @@
   --light-bg:             #f4f1ea;
   --light-surface-1:      #eeeae1;
   --light-surface-2:      #e7e2d7;
-  --light-surface-3:      #ded8ca;
   --light-surface-inset:  #e5dfd3;
   --light-surface-sunk:   rgba(238, 234, 225, 0.6);
   --light-bg-glass:       rgba(244, 241, 234, 0.85);
@@ -187,7 +180,6 @@
 
   --light-text:           #1a201c;
   --light-text-muted:     #55655b;
-  --light-text-dim:       #8a8378;
 
   --light-locked-h: 0;    --light-locked-s: 71%;  --light-locked-l: 42%;  /* #b71f1f */
   --light-solved-h: 152;  --light-solved-s: 90%;  --light-solved-l: 23%;  /* #066f3e */
@@ -219,7 +211,6 @@
 
   --light-glow-alpha-lg: 0.12;
   --light-glow-alpha-md: 0.07;
-  --light-glow-alpha-sm: 0.04;
 
   /* ── ACTIVE THEME — dark is the default ────────────────── */
   color-scheme: dark;
@@ -227,7 +218,6 @@
   --bg:            var(--dark-bg);
   --surface-1:     var(--dark-surface-1);
   --surface-2:     var(--dark-surface-2);
-  --surface-3:     var(--dark-surface-3);
   --surface-inset: var(--dark-surface-inset);
   --surface-sunk:  var(--dark-surface-sunk);
   --bg-glass:      var(--dark-bg-glass);
@@ -237,7 +227,6 @@
 
   --text:          var(--dark-text);
   --text-muted:    var(--dark-text-muted);
-  --text-dim:      var(--dark-text-dim);
 
   --locked-h: var(--dark-locked-h);
   --locked-s: var(--dark-locked-s);
@@ -270,7 +259,6 @@
 
   --glow-alpha-lg: var(--dark-glow-alpha-lg);
   --glow-alpha-md: var(--dark-glow-alpha-md);
-  --glow-alpha-sm: var(--dark-glow-alpha-sm);
 
   /* CRT text bloom — a dark-theme phenomenon; light sets it
      transparent rather than tinting ink with a coloured halo. */
@@ -290,7 +278,6 @@
 
   --glow-lg: hsl(var(--accent-h) var(--accent-s) var(--accent-l) / var(--glow-alpha-lg));
   --glow-md: hsl(var(--accent-h) var(--accent-s) var(--accent-l) / var(--glow-alpha-md));
-  --glow-sm: hsl(var(--accent-h) var(--accent-s) var(--accent-l) / var(--glow-alpha-sm));
 
   /* ── ELEVATION / GLOW LEVELS ───────────────────────────── */
   --elev-photo:
@@ -306,8 +293,11 @@
       inset 0 0 20px var(--glow-md);
 
   /* ── LAYOUT ────────────────────────────────────────────── */
+  /* The 768px breakpoint is deliberately NOT a token. A custom
+     property cannot appear in a media query's condition — `@media
+     (max-width: var(--x))` never matches — so the literal in
+     layout.css and components.css is the only form that works. */
   --sidebar-width: 376px;
-  --breakpoint-md: 768px;
 
   /* ── Z-INDEX ───────────────────────────────────────────── */
   --z-grain:    0;
@@ -360,7 +350,6 @@
   --bg:            var(--light-bg);
   --surface-1:     var(--light-surface-1);
   --surface-2:     var(--light-surface-2);
-  --surface-3:     var(--light-surface-3);
   --surface-inset: var(--light-surface-inset);
   --surface-sunk:  var(--light-surface-sunk);
   --bg-glass:      var(--light-bg-glass);
@@ -370,7 +359,6 @@
 
   --text:          var(--light-text);
   --text-muted:    var(--light-text-muted);
-  --text-dim:      var(--light-text-dim);
 
   --locked-h: var(--light-locked-h);
   --locked-s: var(--light-locked-s);
@@ -403,7 +391,6 @@
 
   --glow-alpha-lg: var(--light-glow-alpha-lg);
   --glow-alpha-md: var(--light-glow-alpha-md);
-  --glow-alpha-sm: var(--light-glow-alpha-sm);
 
   --text-glow:      transparent;
   --text-glow-soft: transparent;
