@@ -389,9 +389,26 @@ export function initHud({ gsap = null, prefersReducedMotion = false } = {}) {
     const from = source.getBoundingClientRect();
     const to = pin.getBoundingClientRect();
 
-    /* Nothing to watch: the hero has scrolled past, or the glyph
-       has no box because its section is still collapsed. */
-    if (!from.width || to.bottom < 0) return false;
+    /* The only thing that cancels a flight is having nothing to
+       launch: a glyph with no box, because its section is still
+       collapsed.
+
+       This used to also bail when the pin had scrolled above the
+       viewport, on the reasoning that a flight to somewhere nobody
+       can see is a flight nobody watches. True of the landing, and
+       wrong about the launch — and the launch is the half that
+       happens where the visitor is looking. Worse, it is the
+       normal case rather than an edge one: answering a challenge
+       means scrolling down to the input, which puts the hero off
+       the top of the screen every time. The guard was skipping the
+       flight almost always.
+
+       So it flies regardless. With the pin above the viewport the
+       glyph travels up, slides under the sticky topbar — its
+       z-index sits below the topbar's for exactly this — and is
+       gone. Which reads as sent upstairs, and is the truth: the
+       pin it is flying to lights up when it lands. */
+    if (!from.width) return false;
 
     const el = source.cloneNode(true);
     el.removeAttribute('id');

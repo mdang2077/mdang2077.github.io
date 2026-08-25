@@ -726,11 +726,17 @@ slicing them in order, so the columns stay coloured while they appear.
 every keystroke. It sits on the line being typed, then on the last line printed.
 
 **The flight is skipped, not faked, when nobody would see it:** no GSAP, reduced
-motion, `document.hidden`, a source with no box (its section still collapsed),
-or the target pin above the viewport. All five seat the pin immediately with the
-identical end state. In practice the last one fires often — solving section 2
-with the hero scrolled away is the normal case, and that is the guard doing its
-job rather than a gap.
+motion, `document.hidden`, or a source with no box (its section still
+collapsed). All four seat the pin immediately with the identical end state.
+
+**A fifth guard was removed later** — the target pin being above the viewport.
+The reasoning was that a flight to somewhere nobody can see is a flight nobody
+watches. That is true of the landing and wrong about the launch, and the launch
+is the half that happens where the visitor is looking. It was also the normal
+case rather than an edge one: answering a challenge means scrolling down to the
+input, which puts the hero off the top of the screen every time, so the guard
+was cancelling the flight on almost every solve. It now flies regardless — up,
+under the sticky topbar, and gone, which is what the pin lighting up means.
 
 **A killed flight cannot strand its pin.** `clearFlights()` runs on every state
 change, so a flight interrupted by the next solve never fires its `onComplete`.
