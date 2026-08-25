@@ -30,7 +30,7 @@ initTheme({ prefersReducedMotion });
 
 /* HUD listens for `ctf:state`, so it must be subscribed before
    initCtf() fires its first `reason: 'init'` event. */
-initHud();
+initHud({ gsap, prefersReducedMotion });
 initCtf();
 
 /* The hero lock. The SVG in the markup is already correct before

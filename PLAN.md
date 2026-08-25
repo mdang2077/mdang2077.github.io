@@ -684,10 +684,10 @@ Phase 4 adds choreography to plumbing that already works end to end.
 
 ### 6. Phase 4 build order
 
-1. Wire `hud.js` for real: pin state transitions and the console printer,
+1. ~~Wire `hud.js` for real: pin state transitions and the console printer,
    still with no flights and no hero timeline. Solving now seats pins and
-   prints lines.
-2. Add the flight clone and its guards.
+   prints lines.~~ **done**
+2. ~~Add the flight clone and its guards.~~ **done**
 3. Build the hero unlock timeline in `animations.js`, triggered off
    `data-solved`. Verify play and reverse in isolation before wiring bypass.
 4. Wire the bypass staggered run and the relock reverse.
@@ -695,6 +695,44 @@ Phase 4 adds choreography to plumbing that already works end to end.
 
 Each step ends deployable: an unfinished later step just means less motion, not
 a broken page.
+
+---
+
+
+### 6b. Steps 1-2 notes
+
+**The printer fast-forwards rather than queues.** Two solves in quick succession
+must not make the second wait on the first's animation, so a new line finishes
+the one in flight instantly and starts typing itself. Typing reveals characters
+across the line's three coloured segments (`[+] `, the body, the count) by
+slicing them in order, so the columns stay coloured while they appear.
+
+**The cursor is moved, not recreated** — recreating it restarts the blink on
+every keystroke. It sits on the line being typed, then on the last line printed.
+
+**The flight is skipped, not faked, when nobody would see it:** no GSAP, reduced
+motion, `document.hidden`, a source with no box (its section still collapsed),
+or the target pin above the viewport. All five seat the pin immediately with the
+identical end state. In practice the last one fires often — solving section 2
+with the hero scrolled away is the normal case, and that is the guard doing its
+job rather than a gap.
+
+**A killed flight cannot strand its pin.** `clearFlights()` runs on every state
+change, so a flight interrupted by the next solve never fires its `onComplete`.
+The pin still seats, because every state change ends in `renderPins()` with the
+real detail — the flight only ever *defers* the seat, it never owns it.
+
+**Verified:** three solves in transcript order print `1/3 2/3 3/3` by print order
+rather than section order; the console holds 84px in every state including
+mid-type; one visible cursor at all times; the clone is `position: fixed` at
+`z-index: 90` against the topbar's 100, so it passes underneath; no horizontal
+overflow while a clone is in flight; ten bypass clicks leave `aria-pressed=false`
+with no debris and no stacked transforms; earned pins survive bypass-off while
+shims clear; and under reduced motion every path above collapses to the same
+instant state with no flights and no typing.
+
+Bypass still applies its state instantly — correct, just not yet choreographed.
+That is step 4.
 
 ---
 

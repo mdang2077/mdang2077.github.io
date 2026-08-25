@@ -388,6 +388,19 @@
   box-shadow: 0 0 var(--space-2) var(--amber-glow);
 }
 
+/* The glyph in flight from a section's badge to its hero pin. It
+   is cloned into <body> and positioned from a measured rect, so
+   the only thing CSS owns here is how it stacks: --z-flight sits
+   deliberately below --z-header, so the glyph passes *under* the
+   sticky topbar rather than over it. */
+.lock-flight {
+  position: fixed;
+  z-index: var(--z-flight);
+  margin: 0;
+  pointer-events: none;
+  will-change: transform;
+}
+
 /* ── STATUS STRIP — progress dots + run console ────────────── */
 .status-strip {
   margin-bottom: var(--space-8);

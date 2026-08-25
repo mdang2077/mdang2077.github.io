@@ -1,11 +1,16 @@
 /* ============================================================
    HUD — the hero pin rail and the run console.
 
-   Phase 3 scope: apply state, animate nothing. Every transition
-   here is instantaneous (bar the CSS colour transitions the pins
-   already carry), which is deliberate — it proves the `ctf:state`
-   plumbing end to end while leaving phase 4 nothing to do but add
-   choreography on top of the same entry point.
+   Phase 4 steps 1 and 2: pins seat with a pop, the console types,
+   and the section's padlock glyph flies to its pin. The hero lock
+   timeline and the bypass staggered run are later steps; bypass
+   still applies its state instantly here, which is correct, just
+   not yet choreographed.
+
+   Everything is a progressive enhancement over the phase 3
+   behaviour. Without GSAP, or under reduced motion, every path
+   below falls through to the same instant state application, and
+   the end state is identical either way.
 
    The console is `aria-hidden` in the markup: it echoes state
    already announced by each challenge's aria-live message and by
@@ -25,6 +30,14 @@ const ROWS = [
 const FILE_COL = 12;
 const VERB_COL = 11;
 
+const TYPE_PER_CHAR = 0.028;
+/* Bypass is not a solve. Its line lands at 3x so it reads as a
+   switch being thrown rather than a machine working. */
+const BYPASS_SPEED = 3;
+
+const SEAT_DURATION = 0.18;
+const FLIGHT_DURATION = 0.52;
+
 const pad = (value, width) => String(value).padEnd(width, ' ');
 
 /* A block glyph rather than a styled box: an inline-block with a
@@ -37,7 +50,7 @@ function cursorEl() {
   return el;
 }
 
-export function initHud() {
+export function initHud({ gsap = null, prefersReducedMotion = false } = {}) {
   const rail = document.querySelector('[data-pin-rail]');
   const log = document.querySelector('[data-run-log]');
   const idleLine = log && log.querySelector('[data-run-log-idle]');
@@ -45,12 +58,91 @@ export function initHud() {
   if (!rail && !log) return;
 
   const pins = rail ? Array.from(rail.querySelectorAll('[data-pin]')) : [];
+  const badges = Array.from(document.querySelectorAll('[data-lock-badge]'));
+
+  /* Motion is the enhancement; state is the guarantee. One flag
+     decides which, checked here rather than at every call site. */
+  const animate = !!gsap && !prefersReducedMotion;
 
   /* Print order, not index order: the console is a transcript, so
      a visitor who solves 3 then 1 sees them in the order they did
-     them. Phase 4's typewriter queues off this same array. */
+     them. */
   const printed = [];
 
+  /* ── THE PRINTER ────────────────────────────────────────────
+     One queue, one tween at a time. If a second line arrives while
+     the first is still typing, the first is fast-forwarded rather
+     than queued behind a delay nobody asked for — a solve should
+     never wait on the previous solve's animation. */
+  const queue = [];
+  let typing = null;
+
+  function segmentsOf(el) {
+    return Array.from(el.childNodes)
+      .filter((node) => node.nodeType === 1 || node.nodeType === 3)
+      .map((node) => ({ node, full: node.textContent }));
+  }
+
+  function reveal(segments, count) {
+    let left = count;
+    segments.forEach(({ node, full }) => {
+      const take = Math.max(0, Math.min(full.length, left));
+      if (node.textContent !== full.slice(0, take)) {
+        node.textContent = full.slice(0, take);
+      }
+      left -= full.length;
+    });
+  }
+
+  function finishTyping() {
+    if (!typing) return;
+    typing.tween.kill();
+    reveal(typing.segments, typing.total);
+    typing = null;
+  }
+
+  function pump() {
+    if (typing || !queue.length) return;
+
+    const { entry, speed } = queue.shift();
+    const segments = segmentsOf(entry.el);
+    const total = segments.reduce((n, s) => n + s.full.length, 0);
+
+    if (!animate) {
+      reveal(segments, total);
+      placeCursor();
+      pump();
+      return;
+    }
+
+    reveal(segments, 0);
+    placeCursor(entry.el);
+
+    const state = { n: 0 };
+    const tween = gsap.to(state, {
+      n: total,
+      duration: (total * TYPE_PER_CHAR) / speed,
+      ease: 'none',
+      onUpdate: () => reveal(segments, Math.round(state.n)),
+      onComplete: () => {
+        typing = null;
+        placeCursor();
+        pump();
+      },
+    });
+
+    typing = { tween, segments, total };
+  }
+
+  function enqueue(entry, speed = 1) {
+    /* The line is in the DOM immediately either way — its height is
+       part of the reserved block, and only its text is withheld. */
+    finishTyping();
+    queue.push({ entry, speed });
+    pump();
+  }
+
+  /* ── LINES ──────────────────────────────────────────────────── */
   function line({ mark, warn, text, count }) {
     const el = document.createElement('p');
     el.className = 'run-log-line' + (warn ? ' run-log-line--warn' : '');
@@ -73,6 +165,25 @@ export function initHud() {
     return el;
   }
 
+  /* The cursor sits on the line being typed, or on the last line
+     printed. It is moved rather than recreated so the blink does
+     not restart on every keystroke. */
+  function placeCursor(onEl) {
+    if (!log) return;
+
+    const target = onEl || (printed.length ? printed[printed.length - 1].el : null);
+
+    printed.forEach((entry) => {
+      if (entry.el === target) return;
+      const stray = entry.el.querySelector('.run-log-cursor');
+      if (stray) stray.remove();
+    });
+
+    if (target && !target.querySelector('.run-log-cursor')) {
+      target.append(cursorEl());
+    }
+  }
+
   function renderLog(detail) {
     if (!log) return;
 
@@ -84,61 +195,172 @@ export function initHud() {
       const row = ROWS[i] || { file: `section_${i}`, verb: 'opened' };
       const rank = printed.filter((entry) => entry.key !== 'bypass').length + 1;
 
-      printed.push({
+      const entry = {
         key: i,
         el: line({
           mark: '[+] ',
           text: `${pad(row.file, FILE_COL)}${pad(row.verb, VERB_COL)}`,
           count: `${rank}/${detail.total}`,
         }),
-      });
+      };
+
+      printed.push(entry);
+      log.append(entry.el);
+      enqueue(entry);
     });
 
     const hasBypassLine = printed.some((entry) => entry.key === 'bypass');
 
     if (detail.bypass && !hasBypassLine) {
-      /* Marked transient: bypass is a shim, not a key, so phase 4
-         removes this line again when bypass goes back off. Solve
-         lines are permanent. */
-      const el = line({
-        mark: '[!] ',
-        warn: true,
-        text: `bypass enabled — ${detail.total} sections force-mounted, ${detail.count} solved`,
-      });
-      el.dataset.transient = '';
-      printed.push({ key: 'bypass', el });
+      /* Marked transient: bypass is a shim, not a key, so it is
+         removed again when bypass goes back off. Solve lines are
+         permanent. */
+      const entry = {
+        key: 'bypass',
+        el: line({
+          mark: '[!] ',
+          warn: true,
+          text: `bypass enabled — ${detail.total} sections force-mounted, ${detail.count} solved`,
+        }),
+      };
+      entry.el.dataset.transient = '';
+
+      printed.push(entry);
+      log.append(entry.el);
+      enqueue(entry, BYPASS_SPEED);
     } else if (!detail.bypass && hasBypassLine) {
       const i = printed.findIndex((entry) => entry.key === 'bypass');
+      if (typing && printed[i].el.contains(typing.segments[0].node)) finishTyping();
       printed[i].el.remove();
       printed.splice(i, 1);
+      placeCursor();
     }
 
-    printed.forEach((entry) => {
-      if (!entry.el.isConnected) log.append(entry.el);
-    });
-
-    /* The resting prompt shows only while nothing has run; once
-       lines exist the cursor sits at the end of the last one. */
+    /* The resting prompt shows only while nothing has run. */
     if (idleLine) idleLine.hidden = printed.length > 0;
-
-    printed.forEach((entry) => {
-      const existing = entry.el.querySelector('.run-log-cursor');
-      if (existing) existing.remove();
-    });
-
-    const last = printed[printed.length - 1];
-    if (last) last.el.append(cursorEl());
   }
 
-  function renderPins(detail) {
+  /* ── PINS ───────────────────────────────────────────────────── */
+  function setPin(pin, state, { pop }) {
+    if (pin.dataset.pinState === state) return;
+    pin.dataset.pinState = state;
+
+    if (!pop || !animate) return;
+
+    /* overwrite: 'auto' rather than a fresh tween per click — a
+       visitor spamming bypass must not stack transforms. */
+    gsap.fromTo(
+      pin,
+      { scale: 0.6 },
+      {
+        scale: 1,
+        duration: SEAT_DURATION,
+        ease: 'back.out(2.2)',
+        overwrite: 'auto',
+      },
+    );
+  }
+
+  function renderPins(detail, { popIndex }) {
     pins.forEach((pin, i) => {
       const state = detail.solved[i] ? 'seated' : detail.bypass ? 'shim' : 'empty';
-      if (pin.dataset.pinState !== state) pin.dataset.pinState = state;
+      setPin(pin, state, { pop: i === popIndex });
     });
   }
 
+  /* ── THE FLIGHT ─────────────────────────────────────────────
+     The section's padlock glyph is cloned, flown to its pin, and
+     dropped there. Two tweens rather than one: x linear and y on
+     `power2.in` gives an arc for free, with no MotionPath plugin
+     and nothing added to the budget.
+
+     Clones are tracked so any state change can kill them. A clone
+     outliving the state it was launched for is how spam-toggling
+     leaves debris on the page. */
+  const inFlight = new Set();
+
+  function clearFlights() {
+    inFlight.forEach((flight) => {
+      flight.tl.kill();
+      flight.el.remove();
+    });
+    inFlight.clear();
+  }
+
+  function flyTo(index, onArrive) {
+    const pin = pins[index];
+    const badge = badges[index];
+    const source = badge && (badge.querySelector('svg') || badge);
+
+    if (!animate || !pin || !source || document.hidden) return false;
+
+    const from = source.getBoundingClientRect();
+    const to = pin.getBoundingClientRect();
+
+    /* Nothing to watch: the hero has scrolled past, or the glyph
+       has no box because its section is still collapsed. */
+    if (!from.width || to.bottom < 0) return false;
+
+    const el = source.cloneNode(true);
+    el.removeAttribute('id');
+    el.classList.add('lock-flight');
+    el.setAttribute('aria-hidden', 'true');
+    el.style.left = `${from.left}px`;
+    el.style.top = `${from.top}px`;
+    el.style.width = `${from.width}px`;
+    el.style.height = `${from.height}px`;
+    document.body.append(el);
+
+    const dx = to.left + to.width / 2 - (from.left + from.width / 2);
+    const dy = to.top + to.height / 2 - (from.top + from.height / 2);
+
+    const flight = { el, tl: null };
+
+    flight.tl = gsap.timeline({
+      onComplete: () => {
+        inFlight.delete(flight);
+        el.remove();
+        onArrive();
+      },
+    });
+
+    flight.tl
+      .to(el, { x: dx, duration: FLIGHT_DURATION, ease: 'none' }, 0)
+      .to(el, { y: dy, duration: FLIGHT_DURATION, ease: 'power2.in' }, 0)
+      .to(el, { scale: 0.35, opacity: 0.9, duration: FLIGHT_DURATION, ease: 'power2.in' }, 0);
+
+    inFlight.add(flight);
+    return true;
+  }
+
+  /* ── ENTRY ──────────────────────────────────────────────────── */
   document.addEventListener('ctf:state', (event) => {
-    renderPins(event.detail);
-    renderLog(event.detail);
+    const detail = event.detail;
+
+    /* Any state change invalidates whatever is mid-air. */
+    clearFlights();
+
+    renderLog(detail);
+
+    const solving = detail.reason === 'solve' && detail.index !== null;
+
+    /* On a solve the pin waits for the glyph: the flight is what
+       explains why the pin lit up. If the flight is skipped — no
+       GSAP, reduced motion, hidden tab, hero off-screen — the pin
+       seats immediately instead, with the same end state. */
+    if (solving) {
+      const flying = flyTo(detail.index, () =>
+        renderPins(detail, { popIndex: detail.index }),
+      );
+      if (flying) {
+        renderPins(
+          { ...detail, solved: detail.solved.map((v, i) => (i === detail.index ? false : v)) },
+          { popIndex: -1 },
+        );
+        return;
+      }
+    }
+
+    renderPins(detail, { popIndex: solving ? detail.index : -1 });
   });
 }
