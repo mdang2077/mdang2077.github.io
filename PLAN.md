@@ -1420,22 +1420,84 @@ Fonts are not in the table: two Google families, woff2, served from a
 third party with its own cache lifetime, and `display=swap` means they
 never block first paint.
 
-### 7. Verification for phase 7
+### 7. Verification for phase 7 — what was run, and what it said
 
-- `grep` sweeps for `style="`, ` on[a-z]*=`, and each deleted token and
-  class — all must return nothing.
-- Unused-token resolver re-run: zero unreferenced tokens remaining.
-- Contrast script re-run after the `--text-dim` deletion: no pair below
-  4.5:1 in either theme.
-- Desktop screenshot diff before/after the pixel sweep — must be empty.
-- Mobile at 390px: identity strip renders in two columns, contacts
-  appear once, in the footer, and the sidebar copy is absent from the
-  tab order.
-- Keyboard-only pass at both widths: every control reachable, focus ring
-  visible, no trap, contacts reachable without solving anything.
-- Reduced-motion pass: content complete and usable, no scrubbed effects.
-- JS-disabled pass: `noscript.css` state — every section revealed, no
-  puzzle machinery, contacts present.
+Everything below was measured, not eyeballed. The site was served on
+localhost and driven with headless Chrome; the probes are in the
+session scratchpad, not the repo (see Open items).
+
+**Grep sweeps.** `style="` → 0. ` on*=` handlers → 0. Inline `<script>`
+→ 1, the pre-paint theme setter, as designed. Each deleted token, and
+`.run-log-name`, resolve to no reference in `css/`, `js/` or
+`index.html`. `v2.0` → gone.
+
+**Unused-token resolver, both directions.** Every definition has a
+reader; every `var(--x)` has a definition. Deleting `--glow-sm`
+orphaned `--glow-alpha-sm`, which the second pass caught and which went
+with it. Three names still resolve to nothing —
+`--theme-origin-x/-y/-r`, set at runtime by `theme.js:60-62`.
+
+**Contrast.** Re-run after the deletion: no pair below 4.5:1 in either
+theme. Table in §5.
+
+**Desktop screenshot diff, 1440x1400, before vs. after the whole
+phase.** 79 pixels differ out of 2,016,000, in two clusters:
+
+  - 43 px at x 1128-1133, y 49-80 — the topbar's `2` becoming a `3`.
+  - 36 px at x 418-459, y 720-760 — a one-level channel difference
+    (delta of 1/255), below any perceptual threshold.
+
+So the pixel sweep and the token deletions changed nothing visible, as
+intended, and the one intended visible change is the one that shows.
+
+**Layout probe at 360, 390, 768 and 1440.** Headless clamps its
+viewport to a 500px minimum, so the two phone widths both report 500 —
+worth knowing before trusting a narrow screenshot from it. At every
+width `scrollWidth < innerWidth` and no element's right edge exceeds
+the viewport: no horizontal overflow anywhere. Below the breakpoint the
+portrait measures 104x139 at the left with the ID card beside it; above
+it, 307x409 in the sidebar column as before.
+
+**The contacts swap, measured rather than assumed.** The first probe
+returned `footerContacts=none` below the breakpoint — a real bug.
+`layout.css` is linked before `components.css` and a media query adds no
+specificity, so `.footer-contacts { display: block }` written in the
+breakpoint block lost on source order to the `display: none` that
+`components.css` sets later. The override moved into `components.css`'s
+own 768px block. Re-probed: exactly one copy displayed at every width.
+
+**Keyboard.** 12 tab stops at both widths — the same 12, so no contact
+link is reachable twice. Order flips as intended:
+
+  - 1440: theme, EQTY link, github, linkedin, resume, bypass, then the
+    three challenge input/submit pairs.
+  - below 768: theme, EQTY link, bypass, the three pairs, then github,
+    linkedin, resume — the contacts last, in the footer.
+
+Focusing each of the 12 in turn and reading back the computed style
+returns an outline on all 12; none falls through to the UA default.
+
+**Reduced motion.** With `--force-prefers-reduced-motion`,
+`document.getAnimations()` returns 0 where the normal render returns 5,
+and all 12 tab stops and all three contact links are still present. The
+one guard in `main.js:18` is doing its job.
+
+**JS disabled.** Chrome's `--disable-javascript` is gone from modern
+builds and `--blink-settings=scriptEnabled=false` stops the headless
+screenshot from ever completing, so the state was reproduced instead:
+`<script>` elements stripped, `<noscript>`'s contents promoted, and the
+`@media (scripting: enabled)` block neutralised — precisely the three
+things a scripting-off engine does to this document. The result is the
+bypassed state, in green: every section's content revealed, no
+challenges, no progress strip, no lock badges, no pin rail, no hero
+lock, contacts present in the footer.
+
+**Not verified here.** Lighthouse, real-device mobile, and the WebGL
+hero lock — headless with `--disable-gpu` has no WebGL, so every
+capture above shows the lock's documented fallback (the stage collapses
+and the lockup closes to MARTIN DANG) rather than the lock. The lock
+itself was verified in phase 3 in a real browser and is untouched by
+this phase.
 
 ## Decisions carried from the brief (do not re-litigate)
 
