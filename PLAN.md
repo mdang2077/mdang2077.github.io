@@ -14,8 +14,8 @@ committable, deployable site. Branch: `feat/v3-motion`. Never commit to `main`.
 | 4 | Unlock system — run log + pin rail + hero lock + bypass relock | **done** |
 | 5 | Section unlock — redraw scanline (`ANIMATIONS.md` effect A, then B) | **done** |
 | 5b | Relock — in-place scramble on bypass off | **done** |
-| 6 | Approved extras | todo |
-| 7 | Polish + full audit | todo |
+| 6 | Approved extras | *deferred — nothing approved* |
+| 7 | Polish + full audit | **done** |
 
 ## File tree
 
@@ -1234,6 +1234,195 @@ pane holds fully glyphed for ~70ms between the swap at 0.50 and the decrypt at
 gap. Frozen ciphertext under a clearing blur reads as a dropped frame.
 
 ---
+
+## Phase 7 — polish + full audit
+
+Phase 6 ("approved extras") is skipped, not cancelled: nothing in
+`ideas.md` was ever approved into a build list, so there is no scope to
+build. It stays in the table as `deferred` so the numbering keeps
+matching the brief.
+
+This phase is the brief's §7 cleanup mandate re-run end to end, plus the
+§9.8 verification pass. Most of §7 was already satisfied in phase 1 —
+the audit below records what was checked, so the next person does not
+have to re-derive it.
+
+### 1. §7 mandate, item by item
+
+| §7 item | State | Evidence |
+|---------|-------|----------|
+| Tokens — real scale, glow derived from hue | done, phase 1 | `tokens.css` — 4px spacing, type scale, radii, border widths, `--glow-*` derive from `--accent-h/s/l` |
+| Inline styles removed | done, phase 1 | `grep 'style="' index.html` → none |
+| Mega-transition selector scoped | done, phase 1 | replaced by `--transition-accent` / `--transition-hover`, applied per component |
+| Type hierarchy — intermediate steps | partial | the scale exists; `--text-lg`, `--text-xl`, `--display-lg` were reserved for phase 3 and never used. See §2 |
+| Vertical rhythm on the scale | partial | `.section` is `--space-10`; ~50 raw px literals remain outside `tokens.css`. See §3 |
+| Mobile — reconsider the stack | **this phase** | See §4 |
+| Focus states, theme-aware | done, phase 1 | `base.css` `:where(a, button, input, summary, [tabindex]):focus-visible` |
+| Semantics — `<header>`, `<form>`, `aria-live`, `role="status"` | done, phase 1 | `index.html` throughout; no duplicate ids |
+| Dead code — `.ctf-stats` / `.stat-card` / `.stat-val` | done, phase 1 | `grep` → none in any file |
+| No `onclick=` / `onkeydown=` | done, phase 1 | `grep ' on[a-z]*="' index.html` → none |
+
+### 2. Dead code sweep
+
+Everything below is defined and never read. Verified by resolving every
+`var(--x)` in `css/` and `js/` plus every quoted `'--x'` against the set
+of definitions in `tokens.css`.
+
+- `.run-log-name` — styled at `components.css:524`, but `hud.js` never
+  emits the class. The run log's name column is written with no class at
+  all and inherits `--text`, which is what the rule was setting. Delete.
+
+- **`--text-dim`** and its two theme values. It is the only token in the
+  system that fails AA (3.43:1 dark, 2.83:1 light — see §5), and two
+  comments in `components.css` already exist to explain what was moved
+  *off* it. Deleting it means the failing pair stops existing rather
+  than being avoided by convention.
+
+- **`--dur-flight` / `--dur-seat` / `--dur-type`** — duplicated, not
+  unused: `hud.js:33-39` holds the same three numbers as
+  `TYPE_PER_CHAR`, `SEAT_DURATION`, `FLIGHT_DURATION` and is what
+  actually drives them. Two sources for one constant is worse than one
+  source in the "wrong" file, so the CSS copies go and `tokens.css`
+  carries a pointer to `hud.js` in their place. This matches the
+  existing rule that GSAP-side eases stay in JS.
+
+- **`--display-lg`, `--text-lg`, `--text-xl`** — the "reserved for phase
+  3" intermediate steps. Phase 3 sized the lockup off the viewport with
+  `clamp()` instead, so they were never taken up. Delete: an unused step
+  is not a hierarchy.
+
+- **`--display-xl`** — 44px, the v2 hero size. Superseded by the
+  lockup's `clamp()`.
+
+- **`--breakpoint-md`** — custom properties cannot be used in a media
+  query's condition, so this could never have worked. The 768px literal
+  in `layout.css` and `components.css` is the real breakpoint. Delete
+  the token and comment the literal.
+
+- **`--glow-sm`, `--space-11`, `--surface-3`, `--tracking-none`** —
+  plain leftovers.
+
+- The topbar reads `v2.0 :: ctf_edition`. This is v3.
+
+### 3. Raw pixel literals
+
+`tokens.css`'s header claims it is the only file allowed to hold a raw
+pixel value; four other files hold about fifty. **Decided: swap only the
+literals that equal an existing token** (`12px` → `--space-3`, `16px` →
+`--space-4`, `20px` → `--space-5`, `24px` → `--space-6`, and so on), so
+the change is provably zero-diff visually.
+
+Off-scale values (`14px`, `26px`, `36px`, `44px`, `92px`, and the
+optical nudges in the lock geometry) stay as literals and each gets a
+comment naming why it is off the scale. Snapping them to the nearest
+4px step was considered and rejected: it moves the hero lockup's optical
+centring, and a scale that is honoured by rounding the things it does
+not fit is not a scale.
+
+### 4. The mobile stack
+
+Brief §7 flagged it and left it open: below 768px `.layout` goes to
+column, so the sidebar's portrait, ID card and contacts all come before
+any content. **Decided: reorder to the brief's suggestion** — hero
+lockup → compact identity strip → content → contacts in the footer.
+
+- **Identity strip.** At ≤768px the sidebar becomes a two-column grid:
+  the portrait at a fixed 104px in column one spanning both rows, the
+  hero tag + blurb and the ID card stacked in column two. No DOM change
+  and no change above the breakpoint.
+
+- **Contacts.** CSS cannot move a child out of its parent, so the
+  footer copy is a second copy in the DOM, as the brief's "repeated in
+  the footer" wording allows. Exactly one of the two is ever displayed —
+  the sidebar copy above 768px, the footer copy below — so only one is
+  ever in the accessibility tree and only one is ever in the tab order.
+  The footer copy gets its own heading id; duplicating `contact-heading`
+  would be invalid.
+
+- **Not gated.** Both copies are outside every stage, so the contacts
+  stay reachable with nothing solved, nothing bypassed, and JS off —
+  which is the §8 non-negotiable this touches.
+
+### 5. Contrast audit — both themes, every pair
+
+Computed with the WCAG 2.1 relative-luminance formula against the four
+grounds a text token can land on. `AA` = ≥4.5:1.
+
+**Dark**
+
+| | bg | surface-1 | surface-2 | surface-inset |
+|---|---|---|---|---|
+| `--text` | 15.34 | 14.72 | 13.80 | 15.34 |
+| `--text-muted` | 5.20 | 4.99 | 4.68 | 5.20 |
+| `--success` | 14.67 | 14.07 | 13.19 | 14.67 |
+| `--danger` | 5.77 | 5.54 | 5.19 | 5.77 |
+| `--warn` | 13.01 | 12.48 | 11.70 | 13.01 |
+| `--amber` | 9.35 | 8.97 | 8.41 | 9.35 |
+| accent, locked | 5.41 | 5.19 | 4.86 | 5.41 |
+| accent, solved | 14.67 | 14.07 | 13.19 | 14.67 |
+
+**Light**
+
+| | bg | surface-1 | surface-2 | surface-inset |
+|---|---|---|---|---|
+| `--text` | 14.69 | 13.80 | 12.83 | 12.49 |
+| `--text-muted` | 5.48 | 5.15 | 4.78 | 4.66 |
+| `--success` | 5.84 | 5.49 | 5.10 | 4.97 |
+| `--danger` | 6.06 | 5.69 | 5.29 | 5.15 |
+| `--warn` | 5.46 | 5.13 | 4.77 | 4.65 |
+| `--amber` | 5.88 | 5.53 | 5.14 | 5.00 |
+| accent, locked | 5.76 | 5.41 | 5.03 | 4.89 |
+| accent, solved | 5.52 | 5.19 | 4.82 | 4.70 |
+
+Every pair passes AA in both themes. The one failure was `--text-dim`
+(3.43 dark, 2.83 light), which §2 deletes. The brief's specific worry —
+`#00ff88` and `#ff3333` on the paper ground — was already handled in
+phase 2: light drops them to `#0a6b3f` and `#b02020`, which is why the
+light accents sit at 5.5-6.1 rather than the ~1.7 the dark values would
+score on `#f4f1ea`.
+
+### 6. Budget
+
+Measured, gzipped, first load, nothing cached:
+
+| | gz |
+|---|---|
+| `index.html` | 6.4KB |
+| CSS, five files | 19.1KB |
+| JS, eight modules | 34.0KB |
+| `portrait.jpg` | 70.6KB |
+| `favicon.svg` | 0.3KB |
+| GSAP core | 27.5KB |
+| ScrollTrigger | 17.4KB |
+| Three r128 | 146.4KB |
+| **total** | **~321KB** |
+
+Under the 600KB ceiling this plan raised it to, and under the brief's
+original 400KB as well — so the conflict the brief asked to be surfaced
+turned out not to bind. Three is 46% of the total and is the only thing
+worth revisiting if the number ever matters; it is already loaded
+`defer` with the hero correct in its absence.
+
+Fonts are not in the table: two Google families, woff2, served from a
+third party with its own cache lifetime, and `display=swap` means they
+never block first paint.
+
+### 7. Verification for phase 7
+
+- `grep` sweeps for `style="`, ` on[a-z]*=`, and each deleted token and
+  class — all must return nothing.
+- Unused-token resolver re-run: zero unreferenced tokens remaining.
+- Contrast script re-run after the `--text-dim` deletion: no pair below
+  4.5:1 in either theme.
+- Desktop screenshot diff before/after the pixel sweep — must be empty.
+- Mobile at 390px: identity strip renders in two columns, contacts
+  appear once, in the footer, and the sidebar copy is absent from the
+  tab order.
+- Keyboard-only pass at both widths: every control reachable, focus ring
+  visible, no trap, contacts reachable without solving anything.
+- Reduced-motion pass: content complete and usable, no scrubbed effects.
+- JS-disabled pass: `noscript.css` state — every section revealed, no
+  puzzle machinery, contacts present.
 
 ## Decisions carried from the brief (do not re-litigate)
 
