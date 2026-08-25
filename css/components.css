@@ -286,14 +286,38 @@
    fractions, which is what makes the number readable. Only the
    badges use this now; the hero lock swings its shackle in three
    dimensions about a pivot group, which is the whole reason it is
-   WebGL. */
+   WebGL.
+
+   Two things make this read as a mechanism opening rather than a
+   logo tilting, and both were wrong before:
+
+   1. SIGN. The legs run down to y=150, fourteen units inside a body
+      whose top edge is y=136, and the pivot is the right leg's tip.
+      A negative angle here swings the *left* leg downward — further
+      into the body it is supposed to be leaving. The open shackle
+      has to rotate positive, lifting the left leg up and over.
+
+   2. ORDER. Lift and rotation used to run as one simultaneous
+      transform, so the left leg cut a chord through the body's
+      shoulder on its way out. They are separate registered
+      properties, so they can be staged instead of blended: opening
+      lifts first and clears both legs of the body, then rotates;
+      closing rotates back first, then drops the legs into their
+      holes. A transition is read off the state being moved *to*, so
+      each direction's delays live on its own rule — the opening
+      order on the state rules below, the closing order on the base
+      `.lock-svg--badge`, which is also where the two properties are
+      authored and therefore where they can transition at all.
+
+      There is deliberately no `transition: transform` here: the
+      transform recomputes every frame the inherited properties
+      change, and smoothing it a second time only adds lag. */
 .shackle-rig {
   transform-box: view-box;
   transform-origin: 145.5px 150px;
   transform:
     translateY(calc(var(--shackle-lift) * 1px))
     rotate(var(--shackle-rotate));
-  transition: transform var(--dur-slow) var(--ease-out);
 }
 
 /* ── SECTION BADGES ──────────────────────────────────────────
@@ -315,6 +339,11 @@
   --shackle-rotate: 0deg;
   --shackle-lift: 0;
 
+  /* Closing: swing back, then seat. */
+  transition:
+    --shackle-rotate var(--dur-mid) var(--ease-out),
+    --shackle-lift var(--dur-mid) var(--ease-out) var(--dur-mid);
+
   height: 1.15em;
   width: auto;
   flex: none;
@@ -335,9 +364,19 @@
   color: var(--accent);
 }
 
+/* -22 clears the legs' 14 units of engagement with 8 to spare, so
+   the swing starts from metal that is fully out of its hole. 46deg
+   puts the left leg clear above and right of the body with the arc
+   standing open — far enough to be unmistakable at 1.15em, short
+   of the point where the arc leaves the badge's line of text. */
 .lock-badge[data-lock-state="unlocked"] .lock-svg--badge {
-  --shackle-rotate: -38deg;
-  --shackle-lift: -14;
+  --shackle-rotate: 46deg;
+  --shackle-lift: -22;
+
+  /* Opening: seat out, then swing. */
+  transition:
+    --shackle-lift var(--dur-mid) var(--ease-out),
+    --shackle-rotate var(--dur-mid) var(--ease-out) var(--dur-mid);
 }
 
 /* Amber, matching the run console's bypass line: "opened, but not
@@ -346,10 +385,19 @@
   color: var(--amber);
 }
 
+/* Bypassed opens the same way, just not all the way: enough lift to
+   clear the hole and half the angle, so it reads as ajar rather
+   than sprung. */
 .lock-badge[data-lock-state="bypassed"] .lock-svg--badge {
-  --shackle-rotate: -20deg;
-  --shackle-lift: -8;
+  --shackle-rotate: 23deg;
+  --shackle-lift: -18;
   opacity: 0.8;
+
+  /* Opening: seat out, then swing. */
+  transition:
+    --shackle-lift var(--dur-mid) var(--ease-out),
+    --shackle-rotate var(--dur-mid) var(--ease-out) var(--dur-mid),
+    opacity var(--dur-mid) var(--ease-out);
 }
 
 /* ── PIN RAIL ────────────────────────────────────────────────
