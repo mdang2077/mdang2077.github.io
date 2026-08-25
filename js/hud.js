@@ -38,6 +38,19 @@ const BYPASS_SPEED = 3;
 const SEAT_DURATION = 0.18;
 const FLIGHT_DURATION = 0.52;
 
+/* The bypass run. Pins go left to right on the way on and right to
+   left on the way off, so the two directions read as the same
+   mechanism running forwards and backwards rather than as two
+   effects. The 120ms head start lets the `[!]` line begin printing
+   first — the switch is thrown, *then* the pins answer it. */
+const PIN_RUN_DELAY = 0.12;
+const PIN_STAGGER = 0.09;
+
+/* The transient bypass line leaves by fading rather than by
+   vanishing: a line disappearing between frames reads as a bug in
+   a block whose height is reserved and therefore does not move. */
+const LINE_FADE = 0.2;
+
 const pad = (value, width) => String(value).padEnd(width, ' ');
 
 /* A block glyph rather than a styled box: an inline-block with a
@@ -184,8 +197,22 @@ export function initHud({ gsap = null, prefersReducedMotion = false } = {}) {
     }
   }
 
+  /* A line on its way out. Spam-toggling must not leave two bypass
+     lines in a block whose height is reserved for four, so the next
+     write flushes it rather than waiting for the fade. */
+  let fading = null;
+
+  function flushFade() {
+    if (!fading) return;
+    fading.tween.kill();
+    fading.el.remove();
+    fading = null;
+  }
+
   function renderLog(detail) {
     if (!log) return;
+
+    flushFade();
 
     /* Newly solved sections, appended in the order they arrived. */
     detail.solved.forEach((isSolved, i) => {
@@ -230,10 +257,32 @@ export function initHud({ gsap = null, prefersReducedMotion = false } = {}) {
       enqueue(entry, BYPASS_SPEED);
     } else if (!detail.bypass && hasBypassLine) {
       const i = printed.findIndex((entry) => entry.key === 'bypass');
-      if (typing && printed[i].el.contains(typing.segments[0].node)) finishTyping();
-      printed[i].el.remove();
+      const entry = printed[i];
+      if (typing && entry.el.contains(typing.segments[0].node)) finishTyping();
+
+      /* Out of `printed` immediately, out of the DOM when the fade
+         ends. It is already gone as far as every other reader is
+         concerned — the cursor, the rank count, the idle prompt —
+         and only the pixels are still leaving. */
       printed.splice(i, 1);
       placeCursor();
+
+      if (!animate) {
+        entry.el.remove();
+        return;
+      }
+
+      fading = {
+        el: entry.el,
+        tween: gsap.to(entry.el, {
+          opacity: 0,
+          duration: LINE_FADE,
+          onComplete: () => {
+            fading = null;
+            entry.el.remove();
+          },
+        }),
+      };
     }
 
     /* The resting prompt shows only while nothing has run. */
@@ -261,10 +310,53 @@ export function initHud({ gsap = null, prefersReducedMotion = false } = {}) {
     );
   }
 
+  const pinStateFor = (detail, i) =>
+    detail.solved[i] ? 'seated' : detail.bypass ? 'shim' : 'empty';
+
   function renderPins(detail, { popIndex }) {
     pins.forEach((pin, i) => {
-      const state = detail.solved[i] ? 'seated' : detail.bypass ? 'shim' : 'empty';
-      setPin(pin, state, { pop: i === popIndex });
+      setPin(pin, pinStateFor(detail, i), { pop: i === popIndex });
+    });
+  }
+
+  /* ── THE BYPASS RUN ─────────────────────────────────────────
+     One reusable timeline, killed and rebuilt on every state
+     change rather than stacked. A run that is killed half way
+     leaves pins in a stale state for exactly as long as it takes
+     the *next* run to reach them — and the next run always writes
+     every pin, so no kill can strand one. That is the property
+     that makes spamming the button safe: the end state is a
+     function of the last event, never of how many are in flight.
+
+     Pins already `seated` are not touched. setPin returns early on
+     a state it is already in, so an earned pin sits still while the
+     shims run past it, which is the whole point of having two
+     states for "open". */
+  let pinRun = null;
+
+  function clearPinRun() {
+    if (!pinRun) return;
+    pinRun.kill();
+    pinRun = null;
+  }
+
+  function runPins(detail, { reverse }) {
+    if (!animate) {
+      renderPins(detail, { popIndex: -1 });
+      return;
+    }
+
+    const order = pins.map((_, i) => i);
+    if (reverse) order.reverse();
+
+    pinRun = gsap.timeline({ onComplete: () => { pinRun = null; } });
+
+    order.forEach((i, step) => {
+      pinRun.call(
+        () => setPin(pins[i], pinStateFor(detail, i), { pop: true }),
+        null,
+        PIN_RUN_DELAY + step * PIN_STAGGER,
+      );
     });
   }
 
@@ -339,13 +431,22 @@ export function initHud({ gsap = null, prefersReducedMotion = false } = {}) {
 
     /* Any state change invalidates whatever is mid-air. */
     clearFlights();
+    clearPinRun();
 
     renderLog(detail);
 
     const solving = detail.reason === 'solve' && detail.index !== null;
 
     if (!solving) {
-      renderPins(detail, { popIndex: -1 });
+      /* Bypass is the only thing that arrives here with a run to
+         play. `init` and anything else applies flat, because a page
+         that loads bypassed must not play a mechanism nobody
+         triggered — the same rule the hero lock follows. */
+      if (detail.reason === 'bypass-on' || detail.reason === 'bypass-off') {
+        runPins(detail, { reverse: detail.reason === 'bypass-off' });
+      } else {
+        renderPins(detail, { popIndex: -1 });
+      }
       return;
     }
 

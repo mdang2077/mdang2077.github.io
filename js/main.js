@@ -46,6 +46,6 @@ initTheme({ prefersReducedMotion });
    the wiring has an order at all. */
 export const lock = initLock({ prefersReducedMotion, gsap });
 
-initAnimations({ lock });
+initAnimations({ lock, prefersReducedMotion });
 initHud({ gsap, prefersReducedMotion });
 initCtf();

@@ -19,9 +19,20 @@
    a courtesy to the choreography, never a dependency of it. */
 const SEAT_TIMEOUT = 900;
 
-export function initAnimations({ lock } = {}) {
+/* Bypass has no seat to chain off, so its hold is a plain delay:
+   long enough for the `[!]` line to be printing and the pin run to
+   have started (hud.js opens that at 120ms and steps 90ms), so the
+   lock is the last thing to move rather than the first. Off is not
+   delayed — a switch thrown back should answer immediately. */
+const BYPASS_DELAY = 300;
+
+export function initAnimations({ lock, prefersReducedMotion = false } = {}) {
   if (!lock) return;
 
+  /* One holder for both kinds of wait — a solve's seat and a
+     bypass's delay — because they are mutually exclusive and any
+     new state change cancels whichever is outstanding. Two timers
+     would mean two ways to be half-cancelled. */
   let pending = null;
 
   function clearPending() {
@@ -47,9 +58,25 @@ export function initAnimations({ lock } = {}) {
     }
 
     /* Bypass is a switch, not a solve: there is no pin flight to
-       wait for, and step 4's staggered run will own its timing. */
+       wait for, so the hold is a fixed delay rather than a cue.
+       Only opening waits — and only when there is motion to be late
+       for. Under reduced motion the delay would be a pause with
+       nothing happening in it. */
     if (reason !== 'solve') {
-      apply(open, { animate: true });
+      clearPending();
+
+      if (!open || prefersReducedMotion) {
+        apply(open, { animate: true });
+        return;
+      }
+
+      pending = {
+        index: null,
+        timer: window.setTimeout(() => {
+          pending = null;
+          lock.setState('unlocked', { animate: true });
+        }, BYPASS_DELAY),
+      };
       return;
     }
 
@@ -79,6 +106,9 @@ export function initAnimations({ lock } = {}) {
      skipped flight's synchronous seat still finds `pending` set. */
   document.addEventListener('hud:seated', (event) => {
     if (!pending) return;
+    /* A bypass hold carries a null index and no seat can match it,
+       so it runs its delay out rather than being cut short by a
+       solve's pin landing. */
     if (event.detail.index !== pending.index) return;
     clearPending();
     lock.setState('unlocked', { animate: true });
