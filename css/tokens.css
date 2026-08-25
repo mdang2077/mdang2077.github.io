@@ -166,8 +166,8 @@
   --dark-lock-steel:  #dfe5ee;   /* shackle — mirror chrome */
   --dark-lock-rim:    #9fc4ff;
   --dark-lock-hemi-ground: #0a0b0e;
-  --dark-lock-hemi-intensity: 0.25;
-  --dark-lock-floor-opacity:  0.42;
+  --dark-lock-hemi-intensity: 0.10;
+  --dark-lock-shine-opacity:  0.50;
 
   --dark-glow-alpha-lg: 0.15;
   --dark-glow-alpha-md: 0.08;
@@ -227,8 +227,8 @@
   --light-lock-steel:  #f0f3f7;
   --light-lock-rim:    #ffe9c4;
   --light-lock-hemi-ground: #d8d3c4;
-  --light-lock-hemi-intensity: 0.55;
-  --light-lock-floor-opacity:  0.20;
+  --light-lock-hemi-intensity: 0.34;
+  --light-lock-shine-opacity:  0.28;
 
   --light-glow-alpha-lg: 0.12;
   --light-glow-alpha-md: 0.07;
@@ -272,7 +272,7 @@
   --lock-rim:             var(--dark-lock-rim);
   --lock-hemi-ground:     var(--dark-lock-hemi-ground);
   --lock-hemi-intensity:  var(--dark-lock-hemi-intensity);
-  --lock-floor-opacity:   var(--dark-lock-floor-opacity);
+  --lock-shine-opacity:   var(--dark-lock-shine-opacity);
 
   --metal-hi:      var(--dark-metal-hi);
   --metal-mid:     var(--dark-metal-mid);
@@ -420,7 +420,7 @@
     --lock-rim:             var(--light-lock-rim);
     --lock-hemi-ground:     var(--light-lock-hemi-ground);
     --lock-hemi-intensity:  var(--light-lock-hemi-intensity);
-    --lock-floor-opacity:   var(--light-lock-floor-opacity);
+    --lock-shine-opacity:   var(--light-lock-shine-opacity);
 
     --metal-hi:      var(--light-metal-hi);
     --metal-mid:     var(--light-metal-mid);
@@ -479,7 +479,7 @@
   --lock-rim:             var(--light-lock-rim);
   --lock-hemi-ground:     var(--light-lock-hemi-ground);
   --lock-hemi-intensity:  var(--light-lock-hemi-intensity);
-  --lock-floor-opacity:   var(--light-lock-floor-opacity);
+  --lock-shine-opacity:   var(--light-lock-shine-opacity);
 
   --metal-hi:      var(--light-metal-hi);
   --metal-mid:     var(--light-metal-mid);

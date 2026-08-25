@@ -42,6 +42,10 @@ export function initLock({ prefersReducedMotion = false, gsap = null } = {}) {
   const stage = document.querySelector('[data-lock-stage]');
   if (!stage) return { setState: noop, destroy: noop };
 
+  /* The band, not the lock, is what the sweep is measured against.
+     See the trigger below. */
+  const hero = stage.closest('.hero-band') || stage;
+
   const svg = stage.querySelector('[data-lock-svg]');
   const spec = svg && svg.querySelector('[data-lock-spec]');
   const title = svg && svg.querySelector('[data-lock-title]');
@@ -142,8 +146,19 @@ export function initLock({ prefersReducedMotion = false, gsap = null } = {}) {
         p: 1,
         ease: 'none',
         scrollTrigger: {
-          trigger: stage,
-          start: 'top bottom',
+          trigger: hero,
+          /* LOCK_SPEC §3 has `top bottom` -> `bottom top`, which is
+             right for an element somewhere down the page and wrong
+             for this one. The hero is the first thing on the page,
+             so that range is already ~70% consumed before the
+             visitor has scrolled a pixel — they would only ever see
+             the tail of the sweep.
+
+             Measuring from the band's own top instead means the
+             full left-to-right pass happens over the hero's exit,
+             and runs right-to-left on the way back up, which is
+             what the scrub does for free. */
+          start: 'top top',
           end: 'bottom top',
           /* Smoothing only. No pin, no sticky: the page scrolls at
              normal speed throughout. Hijacking scroll to play an
@@ -179,7 +194,13 @@ export function initLock({ prefersReducedMotion = false, gsap = null } = {}) {
     if (idleRunning || !gsap) return;
     idleRunning = true;
 
-    const centre = scrubbed.p;
+    /* One pass out and back, starting and ending exactly where the
+       scrub is resting — a raised cosine rather than a sine, so
+       there is no step at either end and the handover to the scrub
+       has nothing to jump from. At the top of the page the resting
+       value is 0, so this is the light leaving the far left and
+       coming back. */
+    const rest = scrubbed.p;
     const swing = { t: 0 };
 
     idleTween = gsap.to(swing, {
@@ -188,7 +209,8 @@ export function initLock({ prefersReducedMotion = false, gsap = null } = {}) {
       ease: 'none',
       repeat: -1,
       onUpdate: () => {
-        p = centre + Math.sin(swing.t * Math.PI * 2) * IDLE_AMPLITUDE;
+        const eased = (1 - Math.cos(swing.t * Math.PI * 2)) / 2;
+        p = Math.min(1, rest + eased * IDLE_AMPLITUDE * 2);
         applyLight();
       },
     });

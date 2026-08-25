@@ -18,8 +18,15 @@
       which reads as plastic.
 
    2. The shine sweep and the unlock never write the same property.
-      The sweep moves lights; the unlock moves meshes. If they ever
-      share one, they fight on every scroll event.
+      The sweep moves lights and one texture offset; the unlock
+      moves meshes. If they ever share one, they fight on every
+      scroll event.
+
+   Three things from LOCK_SPEC.md are deliberately absent: the
+   dark-gunmetal body (both parts are chrome), the tumbler and its
+   key-turn beat (the keyhole is a hole in the body now, with
+   nothing to rotate), and the cast shadow. All three are recorded
+   in PLAN.md's phase 3R notes.
    ============================================================ */
 
 /* Proportions from the reference image, body width = 1.0. Every
@@ -33,6 +40,17 @@ const BEVEL = 0.07;
 const TUBE = (BW * 0.14) / 2;
 const ARC = (BW * 0.83 - TUBE * 2) / 2;
 
+/* The keyhole, taken off the SVG lock's path so the two renderings
+   describe the same object. SVG body is 160 wide x 118 tall at
+   (10,136); everything below is that path expressed as a fraction
+   of BW / BH, measured from the body's centre with y up. */
+const KEY_R = BW * (15.5 / 160);          /* circle radius        */
+const KEY_CY = BH * (0.5 - 39.6 / 118);   /* circle centre, 33.5% down */
+const KEY_TOP_HALF = BW * (5.5 / 160);    /* slot at the tangent  */
+const KEY_BOT_HALF = BW * (13 / 160);     /* slot where it flares */
+const KEY_TANGENT_Y = BH * (0.5 - 54.09 / 118);
+const KEY_BOT_Y = BH * (0.5 - 85.8 / 118);
+
 const BODY_Y = -0.35;
 const BODY_TOP = BODY_Y + BH / 2;
 const ARC_Y = BODY_TOP + BW * 0.77 - ARC - TUBE;
@@ -43,7 +61,6 @@ const ARC_Y = BODY_TOP + BW * 0.77 - ARC - TUBE;
    unmistakable depth with the opening still legible. */
 const SWING = -1.2;
 
-const SHADOW_MAP = () => (window.innerWidth < 768 ? 512 : 1024);
 const PIXEL_RATIO = () =>
   Math.min(window.devicePixelRatio || 1, window.innerWidth < 768 ? 1.5 : 2);
 
@@ -122,8 +139,8 @@ function makeStudioEnv(THREE, renderer, light, fine) {
        renderings of the lock describe the same material. */
     const PERIOD = 26;
     const BAND = light
-      ? [[0, 5, '#ffffff'], [5, 9, '#b9bec6'], [9, 20, '#4a4d53'], [20, 24, '#c8ccd3']]
-      : [[0, 5, '#ffffff'], [5, 9, '#8b95a6'], [9, 20, '#05070b'], [20, 24, '#aebbd0']];
+      ? [[0, 4, '#ffffff'], [4, 8, '#9aa0a8'], [8, 22, '#2e3237'], [22, 25, '#d6dae0']]
+      : [[0, 4, '#ffffff'], [4, 8, '#67718a'], [8, 22, '#000000'], [22, 25, '#c3cfe2']];
 
     for (let x = 0; x < 512; x += PERIOD) {
       BAND.forEach(([from, to, colour]) => {
@@ -173,8 +190,6 @@ export function createLockScene({ THREE, gsap, stage, theme, prefersReducedMotio
 
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
   renderer.setPixelRatio(PIXEL_RATIO());
-  renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   /* Removed in r152+, where it becomes outputColorSpace. Three is
      pinned to r128 in index.html for exactly this reason. */
   renderer.outputEncoding = THREE.sRGBEncoding;
@@ -197,14 +212,9 @@ export function createLockScene({ THREE, gsap, stage, theme, prefersReducedMotio
 
   /* ── LIGHTS ─────────────────────────────────────────────────
      With the environment doing the material work, these only have
-     to carry shadow and rim definition. */
-  const key = new THREE.DirectionalLight(0xffffff, 1.5);
+     to carry the moving highlight and the rim definition. */
+  const key = new THREE.DirectionalLight(0xffffff, 3.4);
   key.position.set(3, 5, 4);
-  key.castShadow = true;
-  key.shadow.mapSize.set(SHADOW_MAP(), SHADOW_MAP());
-  key.shadow.radius = 4;
-  key.shadow.camera.near = 1;
-  key.shadow.camera.far = 16;
   scene.add(key);
 
   const rim = new THREE.DirectionalLight(0x9fc4ff, 0.7);
@@ -249,6 +259,37 @@ export function createLockScene({ THREE, gsap, stage, theme, prefersReducedMotio
   shape.lineTo(-BW / 2, -BH / 2 + BR);
   shape.quadraticCurveTo(-BW / 2, -BH / 2, -BW / 2 + BR, -BH / 2);
 
+  /* The keyhole is a hole in the body's own shape, not a dark disc
+     parked in front of it. That buys three things at once: it cuts
+     clean through to the page exactly as the SVG lock's does, the
+     extrude bevel wraps the cut and gives the drilled edge its
+     bright rim, and there is no separate tumbler mesh left to
+     detach from the body during the recoil. */
+  /* The path is inflated by BEVEL on every side, because the
+     extrude bevel eats that much off a hole's edge. Cut at the
+     spec's own numbers the circle closes to a pinhole and the slot
+     pinches shut entirely — what is drawn here is the size the
+     hole has to be for the *visible* opening to match the SVG. */
+  const holeR = KEY_R + BEVEL;
+  const holeTopHalf = KEY_TOP_HALF + BEVEL;
+  const holeBotHalf = KEY_BOT_HALF + BEVEL;
+  const holeBotY = KEY_BOT_Y - BEVEL;
+  const tangentY = KEY_CY - Math.sqrt(holeR * holeR - holeTopHalf * holeTopHalf);
+
+  const keyhole = new THREE.Path();
+  keyhole.absarc(
+    0,
+    KEY_CY,
+    holeR,
+    Math.atan2(tangentY - KEY_CY, -holeTopHalf),
+    Math.atan2(tangentY - KEY_CY, holeTopHalf),
+    true,
+  );
+  keyhole.lineTo(holeBotHalf, holeBotY);
+  keyhole.lineTo(-holeBotHalf, holeBotY);
+  keyhole.closePath();
+  shape.holes.push(keyhole);
+
   const bodyGeo = new THREE.ExtrudeGeometry(shape, {
     depth: BD,
     bevelEnabled: true,
@@ -261,33 +302,58 @@ export function createLockScene({ THREE, gsap, stage, theme, prefersReducedMotio
 
   const body = new THREE.Mesh(bodyGeo, shell);
   body.position.y = BODY_Y;
-  body.castShadow = true;
-  body.receiveShadow = true;
   lock.add(body);
 
-  /* The tumbler is a *child* of the body, not a sibling. As a
-     sibling it stays put during beat 2's recoil and the keyhole
-     visibly detaches — the bug the combined prototype fixed. */
-  const tumbler = new THREE.Group();
-  /* The bevel adds BEVEL to each face, so the front of the centred
-     body is at BD/2 + BEVEL, not BD/2. The prototype used the
-     latter and buried the keyhole inside the body. */
-  tumbler.position.set(0, 0.335 * -BH + BH / 2, BD / 2 + BEVEL + 0.02);
-  body.add(tumbler);
+  /* ── THE TRAVELLING SHINE ───────────────────────────────────
+     Ported from lock-light-prototype.html, and it exists because
+     of an asymmetry in how the two halves of the lock respond to a
+     moving light.
 
-  const hole = new THREE.Mesh(
-    new THREE.CylinderGeometry(BW * 0.097, BW * 0.097, 0.06, 28),
-    recess,
-  );
-  hole.rotation.x = Math.PI / 2;
-  tumbler.add(hole);
+     The shackle is a tube. Its normals sweep through a wide range,
+     so moving the key light slides a highlight along it exactly as
+     the prototype describes — that half needs nothing but the
+     lights, which already move.
 
-  const slot = new THREE.Mesh(
-    new THREE.BoxGeometry(BW * 0.068, BW * 0.29, 0.06),
-    recess,
-  );
-  slot.position.y = -BW * 0.145;
-  tumbler.add(slot);
+     The body's front face is flat and faces the camera. Every
+     point on it has the same normal, so a moving light barely
+     changes it: what the face shows is the environment, and the
+     environment is fixed in world space. Three r128 has no way to
+     rotate an environment map, so the face gets the prototype's
+     own answer instead — a soft specular band that travels across
+     it, additively blended over the chrome.
+
+     It is built from the body's own Shape, so it is clipped to the
+     silhouette and to the keyhole for free: light never spills
+     past the metal, which is the same rule the SVG lock's mask
+     enforces. */
+  const shineCanvas = document.createElement('canvas');
+  shineCanvas.width = 512;
+  shineCanvas.height = 4;
+  const sg = shineCanvas.getContext('2d');
+  const band = sg.createLinearGradient(0, 0, 512, 0);
+  band.addColorStop(0.0, 'rgba(255,255,255,0)');
+  band.addColorStop(0.33, 'rgba(255,255,255,0.35)');
+  band.addColorStop(0.5, 'rgba(255,255,255,1)');
+  band.addColorStop(0.67, 'rgba(255,255,255,0.35)');
+  band.addColorStop(1.0, 'rgba(255,255,255,0)');
+  sg.fillStyle = band;
+  sg.fillRect(0, 0, 512, 4);
+
+  const shineTex = new THREE.CanvasTexture(shineCanvas);
+  shineTex.wrapS = THREE.ClampToEdgeWrapping;
+  shineTex.wrapT = THREE.ClampToEdgeWrapping;
+
+  const shineMat = new THREE.MeshBasicMaterial({
+    map: shineTex,
+    transparent: true,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+    opacity: 0.5,
+  });
+
+  const shine = new THREE.Mesh(new THREE.ShapeGeometry(shape), shineMat);
+  shine.position.z = BD / 2 + BEVEL + 0.002;
+  body.add(shine);
 
   /* ── SHACKLE — the pivot trick, and the entire reason the lock
      is 3D. The pivot sits at the right leg with the shackle
@@ -325,33 +391,27 @@ export function createLockScene({ THREE, gsap, stage, theme, prefersReducedMotio
     shackle.add(leg);
   });
 
-  shackle.traverse((o) => {
-    if (o.isMesh) o.castShadow = true;
-  });
-
-  const floorMat = new THREE.ShadowMaterial({ opacity: 0.42 });
-  const floor = new THREE.Mesh(new THREE.PlaneGeometry(14, 14), floorMat);
-  floor.rotation.x = -Math.PI / 2;
-  floor.position.y = BODY_Y - BH / 2 - 0.18;
-  floor.receiveShadow = true;
-  scene.add(floor);
 
   /* ── UNLOCK TIMELINE ────────────────────────────────────────
      Absolute start times are part of the design: each beat begins
      before the last ends, so it reads as one continuous mechanism
-     rather than four queued steps.
+     rather than three queued steps.
 
-     There is no fifth beat. The spec flashes the body green here;
-     the lock is a neutral metal object that signals state by
-     opening, and that is the stronger signal. It also means no
-     colour has to be parsed out of a theme token — which Three
-     r128 could not do with our space-separated hsl() anyway. */
+     Two beats from the spec are gone. The key turn is cut with the
+     tumbler — the keyhole is part of the body now and has nothing
+     to rotate. The green emissive flash is cut too: the lock is a
+     neutral metal object and signals state by opening, which is
+     the stronger signal, and with no emissive there is no theme
+     colour for Three r128 to fail to parse.
+
+     The remaining three keep their spacing exactly, shifted 0.36s
+     earlier so the mechanism starts on the first frame rather than
+     after the gap the key turn used to fill. */
   const timeline = gsap.timeline({ paused: true });
   timeline
-    .to(tumbler.rotation, { z: -Math.PI / 2, duration: 0.42, ease: 'power2.inOut' }, 0)
-    .to(body.position, { y: BODY_Y - 0.04, duration: 0.07, yoyo: true, repeat: 1, ease: 'power1.inOut' }, 0.36)
-    .to(pivot.position, { y: 0.4, duration: 0.3, ease: 'back.out(2.4)' }, 0.42)
-    .to(pivot.rotation, { y: SWING, duration: 0.6, ease: 'power3.out' }, 0.66);
+    .to(body.position, { y: BODY_Y - 0.04, duration: 0.07, yoyo: true, repeat: 1, ease: 'power1.inOut' }, 0)
+    .to(pivot.position, { y: 0.4, duration: 0.3, ease: 'back.out(2.4)' }, 0.06)
+    .to(pivot.rotation, { y: SWING, duration: 0.6, ease: 'power3.out' }, 0.3);
 
   /* ── THEME ──────────────────────────────────────────────────
      The environment has to be rebuilt, not just the lights: it
@@ -368,8 +428,9 @@ export function createLockScene({ THREE, gsap, stage, theme, prefersReducedMotio
     rim.color.setHex(token('--lock-rim', light ? 0xffe9c4 : 0x9fc4ff));
     shell.color.setHex(token('--lock-shell', light ? 0x424953 : 0x171b21));
     steel.color.setHex(token('--lock-steel', light ? 0xf0f3f7 : 0xdfe5ee));
-    floorMat.opacity = tokenNumber('--lock-floor-opacity', light ? 0.2 : 0.42);
-
+    /* An additive white band on a near-white lock blows out; on
+       paper it is barely there at all. */
+    shineMat.opacity = tokenNumber('--lock-shine-opacity', light ? 0.28 : 0.5);
     /* PMREM output is a GPU texture: dispose both or every theme
        toggle leaks one. */
     if (steel.envMap) steel.envMap.dispose();
@@ -397,6 +458,12 @@ export function createLockScene({ THREE, gsap, stage, theme, prefersReducedMotio
   function setLight(p) {
     key.position.x = -6 + p * 12;
     rim.position.x = 6 - p * 12;
+
+    /* The band sits at u = 0.5 in its texture, so an offset of
+       0.5 - p puts it at p across the face. The 1.7 overshoot is
+       what carries it fully off both edges rather than parking it
+       at the rim. */
+    shineTex.offset.x = (0.5 - p) * 1.7;
   }
 
   setLight(prefersReducedMotion ? 0.5 : 0);
@@ -445,6 +512,7 @@ export function createLockScene({ THREE, gsap, stage, theme, prefersReducedMotio
       window.removeEventListener('resize', resize);
       if (steel.envMap) steel.envMap.dispose();
       if (shell.envMap) shell.envMap.dispose();
+      shineTex.dispose();
       renderer.dispose();
       canvas.remove();
     },

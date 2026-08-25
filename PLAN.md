@@ -565,7 +565,6 @@ mechanism rather than four queued steps.
 
 | # | Beat | Target | Value | Start | Duration | Ease |
 |---|---|---|---|---|---|---|
-| 1 | tumbler turns | `tumbler.rotation.z` | `-π/2` | 0.00 | 0.42 | `power2.inOut` |
 | 2 | body recoils | `body.position.y` | `-0.39`, yoyo x1 | 0.36 | 0.07 | `power1.inOut` |
 | 3 | shackle pops | `pivot.position.y` | `0.4` | 0.42 | 0.30 | `back.out(2.4)` |
 | 4 | shackle swings | `pivot.rotation.y` | see below | 0.66 | 0.60 | `power3.out` |
@@ -836,8 +835,42 @@ reflects a 26px repeating ramp built from the SVG lock's own stop sequence; the
 shackle keeps the wide softboxes. The tube also went from 22 radial segments to
 36, since its own faceting showed against the finer pattern.
 
+**Three more changes, made after looking at it on screen.**
+
+- **The keyhole is a hole in the body's own extruded shape**, cutting through to
+  the page exactly as the SVG lock's does, with the extrude bevel wrapping the
+  cut to give the drilled edge its bright rim. The path has to be inflated by
+  `bevelSize` on every side, because the bevel eats that much off a hole: cut at
+  the spec's own numbers the circle closes to a pinhole and the slot pinches
+  shut. This deletes the separate tumbler mesh, and with it **beat 1, the key
+  turn** - there is nothing left to rotate. The remaining three beats keep their
+  spacing exactly, shifted 0.36s earlier so the mechanism starts on the first
+  frame instead of after the gap the key turn used to fill.
+- **The cast shadow is gone**, along with the shadow map and the shadow-catcher
+  plane. That also takes `PCFSoftShadowMap` off the phone GPU budget.
+- **The scroll range is measured from the hero band's top, not the lock's
+  bottom.** `LOCK_SPEC.md` (3) specifies `top bottom` -> `bottom top`, which is
+  right for an element somewhere down the page and wrong for the first thing on
+  it: that range is already ~70% consumed before the visitor scrolls a pixel, so
+  they would only ever see the tail of the sweep. Measured from the band's top
+  the full pass happens over the hero's exit - left to right scrolling down,
+  right to left scrolling back up, which the scrub gives for free.
+
 Also decided in the build: **beat 4 swings to -1.2 rad**, not the prototype's
 -1.9, where the shackle reads edge-on as a rod.
+
+**The travelling shine needed a hybrid, and the reason is worth keeping.** The
+two halves of the lock respond to a moving light completely differently. The
+shackle is a tube: its normals sweep a wide range, so moving the key light
+slides a highlight along it exactly as `lock-light-prototype.html` describes.
+The body's front face is flat and faces the camera - every point on it shares a
+normal, so a moving light barely touches it. What that face shows is the
+environment, and an environment map is fixed in world space with no way to
+rotate it in Three r128. So the face gets the prototype's own answer instead: a
+soft specular band, additively blended, travelling across it on a texture
+offset. It is built from the body's own `Shape`, so it is clipped to the
+silhouette *and* to the keyhole for free - the same rule the SVG lock's mask
+enforces, that light never spills past the metal.
 
 **Three bugs found while building, all fixed:**
 
