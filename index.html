@@ -141,8 +141,10 @@
       </div>
     </div>
 
-    <!-- Contact links — never gated, never behind a puzzle. -->
-    <nav aria-labelledby="contact-heading">
+    <!-- Contact links — never gated, never behind a puzzle. This is
+         the desktop copy; below 768px it hides and the footer's copy
+         takes over. See the note down there. -->
+    <nav class="sidebar-contacts" aria-labelledby="contact-heading">
       <div class="section-header section-header--compact">
         <h2 class="section-title section-title--sm" id="contact-heading">contact</h2>
         <span class="section-divider" aria-hidden="true"></span>
@@ -420,7 +422,39 @@
       <p class="visually-hidden" data-relock-live aria-live="polite"></p>
     </section>
 
-    <footer class="footer">&copy; 2026 martin dang &nbsp;|&nbsp; built with curiosity</footer>
+    <footer class="footer">
+
+      <!-- The contacts, a second time.
+
+           Below 768px these belong under the content, not above it —
+           a phone should not have to scroll past a portrait and an ID
+           card to reach the first section. CSS cannot move a child out
+           of its parent, so this is a real second copy in the DOM,
+           which is what the brief's "full contacts repeated in the
+           footer" asks for.
+
+           Exactly one of the two is ever displayed: the sidebar copy
+           above 768px, this one below. `display: none` takes the other
+           out of the accessibility tree and out of the tab order, so
+           no link is ever announced twice or tabbed to twice. The
+           heading needs its own id for the same reason — reusing
+           `contact-heading` would put a duplicate id in the document.
+
+           Like the sidebar copy, this sits outside every stage: the
+           contacts are reachable with nothing solved, nothing
+           bypassed, and JS off. -->
+      <nav class="footer-contacts" aria-labelledby="footer-contact-heading">
+        <h2 class="visually-hidden" id="footer-contact-heading">contact</h2>
+        <div class="socials-list socials-list--centered">
+          <a class="social-link" href="https://github.com/mdang2077" target="_blank" rel="noopener noreferrer"><span class="social-dot" aria-hidden="true"></span>github</a>
+          <a class="social-link" href="https://www.linkedin.com/in/mdang2077/" target="_blank" rel="noopener noreferrer"><span class="social-dot" aria-hidden="true"></span>linkedin</a>
+          <a class="social-link" href="assets/CS_Resume.pdf" target="_blank" rel="noopener noreferrer"><span class="social-dot" aria-hidden="true"></span>resume.pdf</a>
+        </div>
+      </nav>
+
+      <p class="footer-line">&copy; 2026 martin dang &nbsp;|&nbsp; built with curiosity</p>
+
+    </footer>
 
   </main>
 </div>

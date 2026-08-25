@@ -81,11 +81,27 @@
   }
 }
 
+/* 768px, not var(--breakpoint-md): a custom property is not valid
+   inside a media query's condition. The literal is the only form
+   that works, here and in components.css. */
 @media (max-width: 768px) {
   .layout {
     flex-direction: column;
   }
 
+  /* ── THE IDENTITY STRIP ────────────────────────────────────
+     Brief §7 left the mobile stack open, and stacking the sidebar
+     whole put a portrait, an ID card and three contact links ahead
+     of every word of content. So on a phone the sidebar stops
+     being a column and becomes a strip: the portrait and the ID
+     card side by side, the tagline under both, and the contacts
+     gone from here entirely — the footer's copy takes them, below
+     the content where they belong.
+
+     Grid rather than `order` on the flex column, because this is a
+     two-dimensional arrangement: the tagline spans what the
+     portrait and the card divide. DOM order is untouched and so is
+     everything above the breakpoint. */
   .sidebar {
     width: 100%;
     position: static;
@@ -94,6 +110,41 @@
     border-bottom: var(--border-hair) solid var(--border);
     padding: var(--space-7) var(--space-5);
     box-shadow: none;
+
+    display: grid;
+    grid-template-columns: minmax(0, 104px) minmax(0, 1fr);
+    align-items: start;
+    gap: var(--space-4);
+  }
+
+  .hero-photo-wrap { grid-column: 1;      grid-row: 1; }
+  .id-card         { grid-column: 2;      grid-row: 1; }
+  .hero            { grid-column: 1 / -1; grid-row: 2; }
+
+  /* The corner brackets and the halo are sized for a 376px column.
+     On a 104px thumbnail the same values swallow the photo. */
+  .hero-photo-wrap::before,
+  .hero-photo-wrap::after {
+    width: var(--space-6);
+    height: var(--space-6);
+  }
+
+  .hero-photo-glow {
+    inset: calc(var(--space-3) * -1);
+  }
+
+  /* The contacts swap. Only half of it is here: this file is
+     linked BEFORE components.css, and a media query adds no
+     specificity, so `.footer-contacts { display: block }` written
+     here would lose to the `display: none` that components.css
+     sets later in the cascade. It sits in components.css's own
+     768px block instead, next to the rule it has to beat.
+
+     This half works because nothing else ever sets a display on
+     .sidebar-contacts. Exactly one copy is displayed at any
+     width, so neither is ever announced or tabbed to twice. */
+  .sidebar-contacts {
+    display: none;
   }
 
   /* `.layout` is `align-items: flex-start`, so in column

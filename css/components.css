@@ -1067,6 +1067,12 @@
   gap: var(--space-2);
 }
 
+/* The footer copy lays out in a row under a centred rule, so it
+   centres rather than filling like the sidebar's stack does. */
+.socials-list--centered {
+  justify-content: center;
+}
+
 .social-link {
   display: inline-flex;
   align-items: center;
@@ -1102,6 +1108,28 @@
 }
 
 /* ── FOOTER ──────────────────────────────────────────────── */
+/* The footer's contacts copy is the mobile one. Above the
+   breakpoint the sidebar owns the contacts and this is not merely
+   invisible but absent — `display: none` keeps it out of the
+   accessibility tree and out of the tab order, which is the whole
+   reason two copies are allowed to exist. The breakpoint block in
+   layout.css performs the swap. */
+.footer-contacts {
+  display: none;
+  margin-bottom: var(--space-6);
+}
+
+/* Below the breakpoint the sidebar's copy hides (layout.css) and
+   this one takes over. It has to live in this file: components.css
+   is linked after layout.css, so the `display: none` above would
+   otherwise win on source order over an identically specific rule
+   written there. */
+@media (max-width: 768px) {
+  .footer-contacts {
+    display: block;
+  }
+}
+
 .footer {
   border-top: var(--border-hair) solid var(--border);
   padding: 28px 0;
