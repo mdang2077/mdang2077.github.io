@@ -914,17 +914,18 @@ rather than assume it — this is the one place the two systems can collide.
 1. ~~Wrap the three sections in stages, JS-applied positioning, no animation
    yet.~~ **done** — element-geometry diff against the previous commit is empty
    in both the locked and the bypassed render.
-2. `measure()` per `ANIMATIONS.md` §4 — the temporarily-relative,
-   other-pane-hidden measurement. Log both heights, confirm they match the real
-   rendered heights before tweening anything.
-3. The scanline itself: proxy `v`, two `clip-path`s, the beam, the stage height.
-   Solve-only. This is the phase's deliverable.
-4. The three-state model and the resize guard (`BUSY`) — §4's "real bug". Wire
-   bypass on/off and returning-visitor to instant jumps.
-5. Reduced motion + a11y pass: `aria-busy` on the content pane during flight,
-   the existing `aria-live` announcements unchanged, no third live region.
-6. Effect B — the scramble decrypt, driven from step 3's `onUpdate`, per
-   `ANIMATIONS.md` §3.
+2. ~~`measure()` per `ANIMATIONS.md` §4~~ **done, simplified** — see §4b. The
+   panes are in flow when measured, because they are in flow whenever they are
+   not sweeping, so no temporary repositioning is needed.
+3. ~~The scanline itself: proxy `v`, two `clip-path`s, the beam, the stage
+   height. Solve-only.~~ **done** — ~1.18s end to end.
+4. ~~The three-state model and the resize guard (`BUSY`)~~ **done, and the
+   resize guard is gone with the bug it guarded.** See §4b.
+5. ~~Reduced motion + a11y pass~~ **done** — `aria-busy` on the content pane for
+   the length of the sweep, no third live region.
+6. ~~Effect B — the scramble decrypt, driven from step 3's `onUpdate`~~ **done**
+   — it shares the scanline's proxy, so text resolves in the beam's wake rather
+   than after it.
 
 **On step 6.** The ask was Effect A. B is one step and stays last — but the hook
 for it goes in with step 3, because §3's hard rule is that A and B share one
@@ -932,6 +933,38 @@ proxy. Running the scanline to completion and *then* starting a scramble is the
 one implementation the spec explicitly rules out, and retrofitting the shared
 proxy later means rewriting step 3. Leave the `targets` array and the
 `t.top < beamY` check in place even while `scramble()` is a no-op.
+
+---
+
+### 4b. Deviation from `ANIMATIONS.md` §4 — panes are absolute only while sweeping
+
+The spec keeps both panes absolutely positioned for the stage's whole life, with
+the stage carrying a measured pixel height and a debounced resize handler
+re-measuring behind a `BUSY` set.
+
+Shipped instead: the panes go absolute *only during the sweep*, and a settled
+stage has no inline height at all. A pinned height is wrong the moment anything
+inside a pane changes size — and something does. Submitting a **wrong** answer
+prints `// incorrect. try again.` into `.challenge-msg`, which grows the locked
+pane inside an `overflow: hidden` stage measured before that message existed.
+Late webfonts and a rotated phone are the same bug arriving by other routes.
+
+Not pinning removes all three and takes the resize handler with it: there is no
+stored height left to go stale. The busy set survives, doing the other half of
+its job — stopping a second sweep starting on a section already sweeping.
+
+`.pane` also carries no `display` of its own. `flow-root` was the obvious way to
+keep a trailing margin from escaping it, and it made section 1 22px taller: that
+margin escaped through `.reveal` and out of `.section` before this wrapper
+existed, and has to go on escaping. An absolutely positioned box contains its
+margins anyway, which is the only part of a pane's life measured to a pixel.
+
+**§3's "one place the two systems can collide" does not arise in this layout.**
+The concern was the stage's height tween moving the hero pin a glyph is flying
+to. The pin rail is in the hero, *above* every section, so a section growing
+cannot move it. Measured across a full sweep: the pin holds at `613,374` from
+launch to seat while the stage grows 269 -> 288. No rect recomputation was
+needed and none was added.
 
 ---
 
