@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hero lock — combined prototype</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  @property --p { syntax:'<number>'; inherits:true; initial-value:0; }
+
+  :root{
+    --bg:#080c0a; --panel:#0e1210; --border:#2a3d35;
+    --text:#d4e8dc; --muted:#4a6358; --accent:#ff3333; --ok:#00ff88;
+    --hero-size: clamp(2.2rem, 6.5vw, 4.5rem);   /* the MARTIN / DANG type size */
+  }
+  :root[data-theme="light"]{
+    --bg:#f5f2ea; --panel:#eceadf; --border:#c9c4b4;
+    --text:#1c211d; --muted:#6e6a5e; --accent:#b32020; --ok:#0a7d44;
+  }
+
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    background:var(--bg); color:var(--text);
+    font:400 13px/1.7 'JetBrains Mono',ui-monospace,Menlo,monospace;
+    transition:background .35s,color .35s;
+  }
+
+  .topbar{
+    display:flex;justify-content:space-between;align-items:center;
+    padding:14px 28px;border-bottom:1px solid var(--border);
+    position:sticky;top:0;background:color-mix(in srgb,var(--bg) 85%,transparent);
+    backdrop-filter:blur(12px);z-index:100;
+  }
+  .logo{color:var(--accent);font-weight:700;letter-spacing:2px}
+  .tgl{
+    background:none;border:1px solid var(--border);color:var(--muted);
+    font:inherit;font-size:11px;padding:5px 12px;border-radius:4px;cursor:pointer;
+  }
+  .tgl:hover{border-color:var(--accent);color:var(--accent)}
+
+  /* ---- HERO ---- */
+  #hero{
+    display:flex;align-items:center;justify-content:center;gap:min(4vw,44px);
+    padding:9vh 24px;border-bottom:1px solid var(--border);
+    background:var(--panel);
+  }
+  .nm{
+    font-size:var(--hero-size);font-weight:700;letter-spacing:2px;
+    line-height:1;white-space:nowrap;
+  }
+  .nm.b{color:var(--accent)}
+  /* the lock renders at 1.5x the hero type size */
+  #stage{
+    width:calc(1.5 * var(--hero-size) / 0.77);  /* lock fills 77% of the square canvas → visible lock = 1.5x type */
+    aspect-ratio:1; flex:none;
+  }
+  #stage canvas{display:block;width:100%;height:100%}
+
+  .hud{
+    display:flex;gap:14px;align-items:center;justify-content:center;
+    padding:18px;border-bottom:1px solid var(--border);
+    font-size:11px;letter-spacing:1px;color:var(--muted);
+  }
+  .hud b{color:var(--ok);font-weight:400}
+  .btn{
+    background:none;border:1px solid var(--accent);color:var(--accent);
+    font:inherit;font-size:11px;padding:7px 16px;border-radius:4px;cursor:pointer;
+    letter-spacing:1px;
+  }
+  .btn:hover{background:color-mix(in srgb,var(--accent) 12%,transparent)}
+
+  .filler{
+    height:80vh;display:grid;place-items:center;color:var(--muted);font-size:12px;
+    border-bottom:1px solid var(--border);
+  }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo">&gt; mdang@portfolio</div>
+  <button class="tgl" id="theme">[ ☾ ] --theme=dark</button>
+</div>
+
+<div id="hero">
+  <div class="nm">MARTIN</div>
+  <div id="stage"></div>
+  <div class="nm b">DANG</div>
+</div>
+
+<div class="hud">
+  <span>light <b id="pct">0%</b> →</span>
+  <button class="btn" id="play">unlock</button>
+  <button class="btn" id="reset">relock</button>
+  <span>scroll to sweep the light ↓</span>
+</div>
+
+<div class="filler">scroll — the key light tracks across the lock as the hero exits</div>
+<div class="filler">keep going</div>
+<div class="filler">done</div>
+
+<script>
+gsap.registerPlugin(ScrollTrigger);
+const stage = document.getElementById('stage');
+const css   = getComputedStyle(document.documentElement);
+
+/* ─── scene ─────────────────────────────────────────────── */
+const scene    = new THREE.Scene();
+const camera   = new THREE.PerspectiveCamera(35, 1, 0.1, 100);
+camera.position.set(0, 0.30, 5.3);
+camera.lookAt(0, 0.30, 0);
+
+const renderer = new THREE.WebGLRenderer({antialias:true, alpha:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.outputEncoding = THREE.sRGBEncoding;   // NOTE: removed in three r152+
+stage.appendChild(renderer.domElement);
+
+function resize(){
+  const s = stage.clientWidth;
+  renderer.setSize(s, s);
+  camera.aspect = 1; camera.updateProjectionMatrix();
+}
+resize(); addEventListener('resize', resize);
+
+/* ─── lights ────────────────────────────────────────────── */
+const key = new THREE.DirectionalLight(0xffffff, 1.5);
+key.position.set(3, 5, 4);
+key.castShadow = true;
+key.shadow.mapSize.set(1024,1024);
+key.shadow.radius = 4;
+key.shadow.camera.near = 1; key.shadow.camera.far = 16;
+scene.add(key);
+
+const rim = new THREE.DirectionalLight(0x9fc4ff, 0.7);   // cool backlight picks out metal edges
+rim.position.set(-4, 2, -3);
+scene.add(rim);
+
+const hemi = new THREE.HemisphereLight(0x9bb0ff, 0x0a0b0e, 0.25);
+scene.add(hemi);
+
+
+/* ─── environment map — REQUIRED for chrome ────────────────
+   MeshStandardMaterial with high metalness has nothing to reflect
+   without one, so metal renders flat and dark. This procedural
+   studio env (bright top, hard softbox bands, dark floor) is what
+   produces the hard light/dark banding of the reference image.   */
+function makeStudioEnv(light){
+  const c = document.createElement('canvas');
+  c.width = 512; c.height = 256;
+  const g = c.getContext('2d');
+  const sky = g.createLinearGradient(0,0,0,256);
+  if(light){
+    sky.addColorStop(0,'#ffffff'); sky.addColorStop(0.45,'#cfd4dc');
+    sky.addColorStop(0.55,'#8d949e'); sky.addColorStop(1,'#3a3d42');
+  } else {
+    sky.addColorStop(0,'#c9d2e0'); sky.addColorStop(0.42,'#4a5260');
+    sky.addColorStop(0.55,'#101319'); sky.addColorStop(1,'#020305');
+  }
+  g.fillStyle = sky; g.fillRect(0,0,512,256);
+  // vertical softbox bars — a flat metal face reflects these as the hard
+  // bright/dark vertical banding that reads as polished chrome
+  [[24,58],[132,30],[188,74],[300,26],[352,46],[452,36]].forEach(([x,w],i)=>{
+    g.fillStyle = i%2 ? (light?'rgba(255,255,255,.85)':'rgba(205,224,255,.9)') : '#ffffff';
+    g.fillRect(x, 0, w, 150);
+  });
+  // hard dark gaps between them — the near-black side of the contrast
+  g.fillStyle = light ? 'rgba(60,62,68,.55)' : 'rgba(0,0,0,.92)';
+  [[82,50],[162,26],[262,38],[398,54]].forEach(([x,w])=> g.fillRect(x,0,w,150));
+  const t = new THREE.CanvasTexture(c);
+  t.mapping = THREE.EquirectangularReflectionMapping;
+  const pm = new THREE.PMREMGenerator(renderer);
+  pm.compileEquirectangularShader();
+  const env = pm.fromEquirectangular(t).texture;
+  pm.dispose(); t.dispose();
+  return env;
+}
+scene.environment = makeStudioEnv(false);
+
+/* ─── materials — tuned toward the polished-chrome reference ─── */
+const steel = new THREE.MeshStandardMaterial({color:0xdfe5ee, metalness:1.00, roughness:0.10});
+const shell = new THREE.MeshStandardMaterial({color:0x171b21, metalness:0.94, roughness:0.19});
+const dark  = new THREE.MeshStandardMaterial({color:0x07080b, metalness:0.20, roughness:0.92});
+
+const lock = new THREE.Group();
+scene.add(lock);
+
+/* ─── proportions, from the reference image (body width = 1.0) ───
+   body h 0.74 · shackle outer w 0.83 · shackle h 0.77 · tube 0.14      */
+const BW = 1.70,  BH = BW*0.74,  BR = 0.26,  BD = 0.45;
+const TUBE = BW*0.14/2;                       // tube radius
+const ARC  = (BW*0.83 - TUBE*2)/2;            // torus centreline radius
+const bodyTop = -0.35 + BH/2;
+const arcY    = bodyTop + BW*0.77 - ARC - TUBE;
+
+/* ─── body: rounded rect, extruded with a bevel for the chamfer ─── */
+const sh = new THREE.Shape();
+sh.moveTo(-BW/2+BR,-BH/2);
+sh.lineTo( BW/2-BR,-BH/2); sh.quadraticCurveTo( BW/2,-BH/2, BW/2,-BH/2+BR);
+sh.lineTo( BW/2, BH/2-BR); sh.quadraticCurveTo( BW/2, BH/2, BW/2-BR, BH/2);
+sh.lineTo(-BW/2+BR, BH/2); sh.quadraticCurveTo(-BW/2, BH/2,-BW/2, BH/2-BR);
+sh.lineTo(-BW/2,-BH/2+BR); sh.quadraticCurveTo(-BW/2,-BH/2,-BW/2+BR,-BH/2);
+
+const bodyGeo = new THREE.ExtrudeGeometry(sh,{
+  depth:BD, bevelEnabled:true, bevelThickness:0.07, bevelSize:0.07,
+  bevelSegments:4, curveSegments:24
+});
+bodyGeo.center();
+const body = new THREE.Mesh(bodyGeo, shell);
+body.position.y = -0.35;
+body.castShadow = body.receiveShadow = true;
+lock.add(body);
+
+/* ─── keyhole — PARENTED TO THE BODY so it follows the recoil ───
+   (the standalone prototype had it as a sibling: it detached on beat 2) */
+const tumbler = new THREE.Group();
+tumbler.position.set(0, 0.335*-BH + BH/2, BD/2 + 0.02);   // 33.5% down the body face
+body.add(tumbler);
+
+const hole = new THREE.Mesh(new THREE.CylinderGeometry(BW*0.097, BW*0.097, 0.06, 28), dark);
+hole.rotation.x = Math.PI/2;
+tumbler.add(hole);
+const slot = new THREE.Mesh(new THREE.BoxGeometry(BW*0.068, BW*0.29, 0.06), dark);
+slot.position.y = -BW*0.145;
+tumbler.add(slot);
+
+/* ─── shackle — pivot sits at the RIGHT leg.
+   rotating pivot.rotation.y swings it out sideways in depth. THE payoff beat. */
+const pivot = new THREE.Group();
+pivot.position.set(ARC, 0, 0);
+lock.add(pivot);
+
+const shackle = new THREE.Group();
+shackle.position.set(-ARC, 0, 0);          // undo the pivot offset
+pivot.add(shackle);
+
+const arc = new THREE.Mesh(new THREE.TorusGeometry(ARC, TUBE, 22, 56, Math.PI), steel);
+arc.position.y = arcY;
+shackle.add(arc);
+
+const legTop = arcY, legBot = bodyTop - 0.42;      // ends buried inside the body
+const legLen = legTop - legBot;
+[-ARC, ARC].forEach(x=>{
+  const leg = new THREE.Mesh(new THREE.CylinderGeometry(TUBE, TUBE, legLen, 22), steel);
+  leg.position.set(x, (legTop+legBot)/2, 0);
+  shackle.add(leg);
+});
+shackle.traverse(o=>{ if(o.isMesh) o.castShadow = true; });
+
+/* ─── shadow catcher ─── */
+const floorMat = new THREE.ShadowMaterial({opacity:0.30});
+const floor = new THREE.Mesh(new THREE.PlaneGeometry(14,14), floorMat);
+floor.rotation.x = -Math.PI/2;
+floor.position.y = -0.35 - BH/2 - 0.18;
+floor.receiveShadow = true;
+scene.add(floor);
+
+/* ─── 1. UNLOCK TIMELINE ────────────────────────────────── */
+const tl = gsap.timeline({paused:true});
+tl.to(tumbler.rotation, {z:-Math.PI/2, duration:0.42, ease:'power2.inOut'}, 0)
+  .to(body.position,    {y:-0.39, duration:0.07, yoyo:true, repeat:1, ease:'power1.inOut'}, 0.36)
+  .to(pivot.position,   {y:0.40,  duration:0.30, ease:'back.out(2.4)'}, 0.42)
+  .to(pivot.rotation,   {y:-1.9,  duration:0.60, ease:'power3.out'}, 0.66)
+  .to(shell.emissive,   {r:0.10, g:0.42, b:0.24, duration:0.15}, 0.70)
+  .to(shell.emissive,   {r:0, g:0, b:0, duration:0.70, ease:'power2.out'}, 0.90);
+
+/* ─── 2. SCROLL LIGHT SWEEP ─────────────────────────────────
+   one scalar p: 0 = light hard left, 1 = light hard right.
+   in 3D this moves the actual light, so specular / shading /
+   cast shadow all follow for free — including mid-unlock.      */
+const pctEl = document.getElementById('pct');
+const state = {p:0};
+const sweep = gsap.to(state,{
+  p:1, ease:'none',
+  scrollTrigger:{
+    trigger:'#hero',
+    start:'top bottom',      // p=0 as the hero enters the viewport bottom
+    end:'bottom top',        // p=1 as it exits the top
+    scrub:0.5,               // smoothing only — NO pin, NO sticky
+  },
+  onUpdate(){
+    key.position.x = -6 + state.p*12;      // key light travels left → right
+    rim.position.x =  6 - state.p*12;      // rim light travels opposite
+    pctEl.textContent = Math.round(state.p*100)+'%';
+  }
+});
+
+/* ─── 3. THEME ──────────────────────────────────────────── */
+function applyTheme(t){
+  document.documentElement.dataset.theme = t;
+  const light = t === 'light';
+  hemi.groundColor.set(light ? 0xd8d3c4 : 0x0a0b0e);
+  hemi.intensity   = light ? 0.55 : 0.25;
+  rim.color.set(light ? 0xffe9c4 : 0x9fc4ff);
+  shell.color.set(light ? 0x424953 : 0x171b21);
+  steel.color.set(light ? 0xf0f3f7 : 0xdfe5ee);
+  floorMat.opacity = light ? 0.20 : 0.42;
+  if(scene.environment) scene.environment.dispose();
+  scene.environment = makeStudioEnv(light);
+  document.getElementById('theme').textContent =
+    light ? '[ ☀ ] --theme=light' : '[ ☾ ] --theme=dark';
+}
+document.getElementById('theme').addEventListener('click',()=>{
+  applyTheme(document.documentElement.dataset.theme === 'light' ? 'dark' : 'light');
+});
+applyTheme('dark');
+
+/* ─── controls ─── */
+document.getElementById('play') .addEventListener('click',()=> tl.progress()===1 ? tl.restart() : tl.play());
+document.getElementById('reset').addEventListener('click',()=> tl.reverse());
+
+/* ─── render loop ─── */
+let visible = true;
+new IntersectionObserver(e=>{visible = e[0].isIntersecting;}).observe(stage);
+(function tick(){
+  requestAnimationFrame(tick);
+  if(!visible || document.hidden) return;                 // don't burn battery off-screen
+  lock.position.y = Math.sin(performance.now()/1400)*0.02;  // faint idle float, no rotation
+  renderer.render(scene,camera);
+})();
+
+/* ─── reduced motion: snap to CURRENT state, never force-unlock ─── */
+if (matchMedia('(prefers-reduced-motion: reduce)').matches){
+  ScrollTrigger.getAll().forEach(t=>t.kill());
+  key.position.x = 0; rim.position.x = 0;                 // neutral front lighting (p = 0.5)
+  tl.progress(0);                                          // stays locked until actually solved
+}
+</script>
+</body>
+</html>

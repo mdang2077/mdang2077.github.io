@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Scroll light sweep</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+<style>
+  /* --p drives everything: 0 = light hard left, 1 = light hard right */
+  @property --p { syntax: '<number>'; inherits: true; initial-value: 0; }
+  :root { --ink:#0b0c0f; }
+  * { box-sizing:border-box; }
+  body {
+    margin:0; background:var(--ink); color:#e8e6e1;
+    font:400 15px/1.5 ui-monospace, "SF Mono", Menlo, monospace;
+  }
+  /* Normal flow — no sticky, no pin. Page never stops scrolling. */
+  .band { display:grid; place-items:center; padding:22vh 24px; }
+  .rig { --p:0; position:relative; width:min(58vmin,320px); }
+  .lamp {
+    position:absolute; top:-22%; left:calc(-10% + var(--p) * 120%);
+    width:14px; height:14px; border-radius:50%;
+    background:#fff8e2;
+    box-shadow:0 0 24px 10px rgba(255,232,176,.55), 0 0 90px 40px rgba(255,220,150,.18);
+  }
+  .shadow {
+    position:absolute; left:8%; right:8%; bottom:-10%; height:26px;
+    background:radial-gradient(50% 50% at 50% 50%, rgba(0,0,0,.65), transparent 70%);
+    filter:blur(6px);
+    transform:
+      translateX(calc((0.5 - var(--p)) * 180px))
+      scaleX(calc(1.15 - 0.3 * var(--p)));
+  }
+  .square {
+    aspect-ratio:1; border-radius:22px;
+    background:
+      /* specular hotspot — tracks the lamp */
+      radial-gradient(26% 40% at calc(var(--p) * 100%) 38%,
+        rgba(255,255,255,.95), rgba(255,255,255,0) 70%),
+      /* warm diffuse wash */
+      radial-gradient(95% 125% at calc(-10% + var(--p) * 120%) 48%,
+        rgba(255,234,186,.6), rgba(255,234,186,0) 62%),
+      /* shade, anchored to the opposite side so it flips automatically */
+      radial-gradient(115% 150% at calc(110% - var(--p) * 120%) 52%,
+        rgba(0,0,0,.8), rgba(0,0,0,0) 68%),
+      linear-gradient(160deg,#3a3f4a,#22252c);
+    box-shadow:
+      inset calc((0.5 - var(--p)) * 3px) 0 0 rgba(255,255,255,.35),
+      inset calc((var(--p) - 0.5) * 3px) 0 0 rgba(0,0,0,.5),
+      0 30px 60px rgba(0,0,0,.5);
+  }
+  .hud { position:absolute; left:0; bottom:-46px; font-size:12px; letter-spacing:.08em; color:#8d8f97; }
+  .note { display:grid; place-items:center; height:45vh; color:#6f727a; font-size:13px; }
+</style>
+</head>
+<body>
+<div class="note">scroll ↓ — light tracks each square as it crosses the viewport</div>
+<div class="band">
+  <div class="rig">
+    <div class="lamp"></div><div class="shadow"></div><div class="square"></div>
+    <div class="hud">light <span class="pct">0%</span> →</div>
+  </div>
+</div>
+<div class="band">
+  <div class="rig">
+    <div class="lamp"></div><div class="shadow"></div><div class="square"></div>
+    <div class="hud">light <span class="pct">0%</span> →</div>
+  </div>
+</div>
+<div class="band">
+  <div class="rig">
+    <div class="lamp"></div><div class="shadow"></div><div class="square"></div>
+    <div class="hud">light <span class="pct">0%</span> →</div>
+  </div>
+</div>
+<div class="note">done</div>
+<script>
+  gsap.registerPlugin(ScrollTrigger);
+  document.querySelectorAll('.rig').forEach(rig => {
+    const pct = rig.querySelector('.pct');
+    const state = { p: 0 };
+    gsap.to(state, {
+      p: 1,
+      ease: 'none',
+      scrollTrigger: {
+        trigger: rig,
+        start: 'top bottom',   // p=0 when the square's top enters the bottom of the viewport
+        end: 'bottom top',     // p=1 when its bottom exits the top — full sweep = one pass-through
+        scrub: 0.5,            // smoothing only; scroll is never blocked
+        // no pin, no sticky → page keeps moving at normal speed
+      },
+      onUpdate() {
+        rig.style.setProperty('--p', state.p.toFixed(4));
+        pct.textContent = Math.round(state.p * 100) + '%';
+      }
+    });
+  });
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    ScrollTrigger.getAll().forEach(t => t.kill());
+    document.querySelectorAll('.rig').forEach(r => r.style.setProperty('--p', .5));
+  }
+</script>
+</body>
+</html>
