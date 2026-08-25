@@ -1,10 +1,10 @@
 /* ============================================================
    REVEAL — the section unlock stage.
 
-   Spec: `ANIMATIONS.md` §1 (effect A), §3 (how A and B compose),
-   §4 (the shared requirements). This module is the whole of the
-   block swap; `animations.js` stays the hero/status-strip
-   choreographer and does not grow this concern.
+   Spec: `ANIMATIONS.md` §1 (effect A) and §4 (shared
+   requirements). This module is the whole of the block swap;
+   `animations.js` stays the hero/status-strip choreographer and
+   does not grow this concern.
 
    What it owns, and nothing else writes any of it:
 
@@ -12,21 +12,32 @@
      `clip-path` on both panes
      the stage's inline `height`, and only while sweeping
      the beam's `top`
-     `textContent` on the leaf text nodes it collected
 
-   That list is `ANIMATIONS.md` §3's hard rule made concrete: the
-   scanline writes geometry, the scramble writes text, and neither
-   touches the other's property. ctf.js goes on writing its display
-   classes on `.challenge` / `.reveal`; the stylesheet neutralises
-   them inside a ready stage, so they are the no-stage fallback
-   rather than a second opinion.
+   ctf.js goes on writing its display classes on `.challenge` /
+   `.reveal`; the stylesheet neutralises them inside a ready stage,
+   so they are the no-stage fallback rather than a second opinion.
 
-   ── ONE DEVIATION FROM THE SPEC, AND WHY ────────────────────
+   ── TWO DEVIATIONS FROM THE SPEC, BOTH REQUESTED ────────────
+   1. NO EFFECT B. `ANIMATIONS.md` §2 and §3 have the revealed text
+      resolving out of scrambled ciphertext in the beam's wake,
+      composed through the same proxy. Built, seen, and cut: the
+      beam alone is the effect, and the churn was noise on top of
+      it. §3's shared-proxy argument only ever existed to stop the
+      two reading as a queue — with one effect there is no queue,
+      and no `textContent` writer left in this module.
+
+   2. BYPASS SWEEPS. §5 has bypass jumping straight to `unlocked`
+      with no beam. It now runs the same sweep the solves do, three
+      of them staggered, because a switch that opens three sections
+      is still worth watching. Bypass *off* is unchanged and stays
+      instant — going back is not a payoff and should not be paced
+      like one.
+
+   ── AND ONE THAT IS NOT ─────────────────────────────────────
    `ANIMATIONS.md` §4 has both panes absolutely positioned for the
    whole of the stage's life, the stage carrying a measured pixel
-   height, and a debounced resize handler re-measuring — guarded by
-   a busy set, because re-measuring mid-sweep snaps the section
-   back to locked.
+   height, and a debounced resize handler re-measuring behind a
+   busy set.
 
    Here the panes go absolute *only during the sweep*. Settled, the
    visible pane is in normal flow and the stage has no inline
@@ -47,48 +58,30 @@
    on the real one anyway, because completion drops back to auto.
    ============================================================ */
 
-/* Effect A, `ANIMATIONS.md` §1. Deliberately slower than a UI
-   transition: it is the payoff for solving something, and the beam
-   has to read as a scan rather than a flash. */
-const SWEEP = 1.0;
-const BEAM_IN = 0.1;
-const BEAM_OUT = 0.2;
-const SWEEP_START = 0.06;
+/* Effect A, `ANIMATIONS.md` §1, every beat of it a half longer
+   than the spec's. ~1.77s end to end. It was already slower than a
+   UI transition on purpose — it is the payoff for solving
+   something — and at 1.0s the beam still crossed a short section
+   faster than the eye tracks it. Scale these together or the beam
+   fades out somewhere other than the end of its own travel. */
+const SWEEP = 1.5;
+const BEAM_IN = 0.15;
+const BEAM_OUT = 0.3;
+const SWEEP_START = 0.09;
+/* How far before the sweep ends the beam starts leaving, so it is
+   gone as it lands rather than blinking out after it. */
+const BEAM_OUT_LEAD = 0.165;
 
-/* Effect B, §2. Short, because each one starts in the beam's wake
-   and has to resolve before the eye follows the beam down. */
-const SCRAMBLE = 0.35;
-const GLYPH = '!<>-_\\/[]{}—=+*^?#%01ABCDEF';
+/* Bypass opens every locked section at once, which without this is
+   three beams running in lockstep — one gesture read three times.
+   The stagger from `PLAN.md` §3's bypass run, so the page has one
+   idea of what "all at once, but sequenced" means. */
+const BYPASS_STAGGER = 0.08;
 
 /* A sweep that never finishes must not leave a section clipped
    shut. Backgrounding the tab stops the frames, so this is what
    guarantees the end state to anyone who leaves and comes back. */
 const SAFETY = (SWEEP + BEAM_OUT + 1) * 1000;
-
-/* Text long enough to be worth decrypting. Under this a scramble
-   reads as a flicker rather than as a decode. */
-const MIN_SCRAMBLE = 3;
-
-const randomGlyph = () => GLYPH[(Math.random() * GLYPH.length) | 0];
-
-/* The innermost text-bearing nodes, per §2 — an element with no
-   element children. Scrambling a container would rewrite its
-   markup as a string sixty times a second and destroy everything
-   nested inside it. */
-function leafText(root) {
-  const out = [];
-  const walk = (el) => {
-    const children = Array.from(el.children);
-    if (!children.length) {
-      const text = el.textContent;
-      if (text && text.trim().length >= MIN_SCRAMBLE) out.push({ el, text });
-      return;
-    }
-    children.forEach(walk);
-  };
-  walk(root);
-  return out;
-}
 
 export function initReveal({ gsap = null, prefersReducedMotion = false } = {}) {
   const stages = Array.from(document.querySelectorAll('[data-stage]'));
@@ -97,7 +90,7 @@ export function initReveal({ gsap = null, prefersReducedMotion = false } = {}) {
   /* Motion is the enhancement, state is the guarantee — the same
      split hud.js makes. Without GSAP, or under reduced motion,
      every route below lands on an identical end state with no
-     tween, no beam, and no scramble. */
+     tween and no beam. */
   const animate = !!gsap && !prefersReducedMotion;
 
   const items = stages
@@ -139,7 +132,6 @@ export function initReveal({ gsap = null, prefersReducedMotion = false } = {}) {
        not identical to `none` for a box with a shadow. */
     item.locked.style.clipPath = '';
     item.content.style.clipPath = '';
-    item.content.removeAttribute('aria-busy');
   }
 
   /* ── MEASUREMENT ────────────────────────────────────────────
@@ -166,32 +158,6 @@ export function initReveal({ gsap = null, prefersReducedMotion = false } = {}) {
     return { hL, hC };
   }
 
-  /* §2: whitespace never scrambles, so the text keeps its shape.
-     Every glyph is one monospace cell wide, so a churning line
-     cannot rewrap and shift what is under it. */
-  function scramble(target) {
-    const { el, text } = target;
-    const p = { v: 0 };
-
-    return gsap.to(p, {
-      v: 1,
-      duration: SCRAMBLE,
-      ease: 'power2.out',
-      onUpdate: () => {
-        const cut = Math.floor(p.v * text.length);
-        let out = '';
-        for (let i = 0; i < text.length; i++) {
-          const ch = text[i];
-          out += i < cut || ch === '\n' || ch === ' ' ? ch : randomGlyph();
-        }
-        el.textContent = out;
-      },
-      onComplete: () => {
-        el.textContent = text;
-      },
-    });
-  }
-
   /* Tear a sweep down and leave nothing of it behind. Safe to call
      on an item that is not sweeping. */
   function stop(item) {
@@ -203,30 +169,26 @@ export function initReveal({ gsap = null, prefersReducedMotion = false } = {}) {
       window.clearTimeout(item.safety);
       item.safety = null;
     }
-    if (item.targets) {
-      item.targets.forEach((t) => {
-        if (t.tween) t.tween.kill();
-        t.el.textContent = t.text;
-      });
-      item.targets = null;
-    }
     const beam = item.stage.querySelector('.beam');
     if (beam) beam.remove();
     busy.delete(item);
   }
 
   /* ── THE SWEEP ──────────────────────────────────────────────
-     One proxy drives the two clip-paths, the beam, and which text
-     has started resolving. §3's whole argument is that a scanline
-     followed by a scramble reads as two animations queued back to
-     back; sharing the proxy is what makes the beam look like it is
-     *doing* the decryption rather than announcing it.
+     One proxy drives both clip-paths and the beam, so the three
+     cannot drift apart: the beam is exactly the seam between the
+     pane closing above it and the one opening below.
 
      The stage's height is the one thing on a tween of its own. It
      runs the same window and the same ease, but it is a layout
      property, and driving it from the proxy would put a style
-     write and a layout read in the same frame. */
-  function sweep(item) {
+     write and a layout read in the same frame.
+
+     `delay` is bypass's stagger. It elapses with the stage already
+     rigged — height pinned, panes absolute, content clipped fully
+     shut — which is pixel-identical to the locked state it is
+     still showing, so the wait is invisible. */
+  function sweep(item, delay = 0) {
     const { stage, locked, content } = item;
     const { hL, hC } = measure(item);
     const hMax = Math.max(hL, hC);
@@ -242,10 +204,12 @@ export function initReveal({ gsap = null, prefersReducedMotion = false } = {}) {
 
     locked.hidden = false;
     content.hidden = false;
-    /* Churning text is garbage to a screen reader. The section's
-       own aria-live regions have already announced the solve, so
-       muting the pane for the length of the sweep costs nothing. */
-    content.setAttribute('aria-busy', 'true');
+    /* No `aria-busy` here, deliberately. The spec asks for it, but
+       its reason was that scrambling text is garbage mid-flight —
+       and nothing scrambles any more. The content is final and
+       correct from the first frame and merely clipped, which is a
+       visual state; hiding it from assistive tech for the length
+       of the sweep would take it away for no benefit. */
     content.style.clipPath = 'inset(0 0 100% 0)';
     locked.style.clipPath = 'inset(0% 0 0 0)';
 
@@ -254,19 +218,10 @@ export function initReveal({ gsap = null, prefersReducedMotion = false } = {}) {
     beam.setAttribute('aria-hidden', 'true');
     stage.append(beam);
 
-    /* Captured now, while the pane is laid out and still. Reading
-       offsetTop inside onUpdate would be a forced layout per
-       element per frame. */
-    item.targets = leafText(content).map((t) => ({
-      ...t,
-      top: t.el.offsetTop,
-      started: false,
-      tween: null,
-    }));
-
     const p = { v: 0 };
 
     item.tl = gsap.timeline({
+      delay,
       onComplete: () => {
         stop(item);
         paint(item, 'unlocked');
@@ -282,25 +237,15 @@ export function initReveal({ gsap = null, prefersReducedMotion = false } = {}) {
           duration: SWEEP,
           ease: 'power2.inOut',
           onUpdate: () => {
-            const beamY = p.v * hMax;
             content.style.clipPath = `inset(0 0 ${(1 - p.v) * 100}% 0)`;
             locked.style.clipPath = `inset(${p.v * 100}% 0 0 0)`;
-            beam.style.top = `${beamY}px`;
-
-            /* Effect B, started in the beam's wake. The wake is
-               also what staggers them: §4 asks for a cap on
-               concurrent scrambles and this is it, for free. */
-            item.targets.forEach((t) => {
-              if (t.started || t.top >= beamY) return;
-              t.started = true;
-              t.tween = scramble(t);
-            });
+            beam.style.top = `${p.v * hMax}px`;
           },
         },
         SWEEP_START,
       )
       .to(stage, { height: hC, duration: SWEEP, ease: 'power2.inOut' }, SWEEP_START)
-      .to(beam, { opacity: 0, duration: BEAM_OUT }, SWEEP_START + SWEEP - 0.11);
+      .to(beam, { opacity: 0, duration: BEAM_OUT }, SWEEP_START + SWEEP - BEAM_OUT_LEAD);
 
     /* The end state is a promise, not a side effect of frames
        arriving. A backgrounded tab stops the timeline where it
@@ -309,28 +254,38 @@ export function initReveal({ gsap = null, prefersReducedMotion = false } = {}) {
       if (!busy.has(item)) return;
       stop(item);
       paint(item, 'unlocked');
-    }, SAFETY);
+    }, SAFETY + delay * 1000);
   }
 
   /* ── ENTRY ──────────────────────────────────────────────────
-     The same `ctf:state` every other module listens to. Only a
-     live solve of a still-locked section animates; every other
-     route in is a flat jump, which is the rule `reason: 'init'`
-     established and bypass inherits. */
+     The same `ctf:state` every other module listens to. Two routes
+     animate — a live solve, and bypass being switched on — and
+     everything else is a flat jump: `reason: 'init'`, bypass going
+     back off, and any section already open.
+
+     A section that is already `unlocked` is never swept. That is
+     what stops bypass replaying the reveal of a section somebody
+     earned a minute ago, and it is the same test that stops a
+     second solve of one section re-running it. */
   document.addEventListener('ctf:state', (event) => {
     const detail = event.detail;
 
+    /* Counts only the sections this event actually opens, so the
+       stagger has no gaps in it when one of the three was already
+       solved before the switch was thrown. */
+    let step = 0;
+
     items.forEach((item) => {
       const open = detail.solved[item.index] || detail.bypass;
+      const shut = item.state !== 'unlocked';
 
       const solving =
-        detail.reason === 'solve' &&
-        detail.index === item.index &&
-        item.state !== 'unlocked';
+        detail.reason === 'solve' && detail.index === item.index && shut;
+      const bypassing = detail.reason === 'bypass-on' && open && shut;
 
-      if (solving && animate) {
+      if ((solving || bypassing) && animate) {
         stop(item);
-        sweep(item);
+        sweep(item, bypassing ? step++ * BYPASS_STAGGER : 0);
         return;
       }
 

@@ -923,9 +923,10 @@ rather than assume it — this is the one place the two systems can collide.
    resize guard is gone with the bug it guarded.** See §4b.
 5. ~~Reduced motion + a11y pass~~ **done** — `aria-busy` on the content pane for
    the length of the sweep, no third live region.
-6. ~~Effect B — the scramble decrypt, driven from step 3's `onUpdate`~~ **done**
-   — it shares the scanline's proxy, so text resolves in the beam's wake rather
-   than after it.
+6. ~~Effect B — the scramble decrypt, driven from step 3's `onUpdate`~~ **built,
+   then cut on request.** See §4c. There is no `textContent` writer left in
+   `reveal.js`, so `ANIMATIONS.md` §2 and §3 are now unimplemented by decision
+   rather than pending.
 
 **On step 6.** The ask was Effect A. B is one step and stays last — but the hook
 for it goes in with step 3, because §3's hard rule is that A and B share one
@@ -933,6 +934,29 @@ proxy. Running the scanline to completion and *then* starting a scramble is the
 one implementation the spec explicitly rules out, and retrofitting the shared
 proxy later means rewriting step 3. Leave the `targets` array and the
 `t.top < beamY` check in place even while `scramble()` is a no-op.
+
+---
+
+### 4c. Requested changes to the shipped effect
+
+Three, after seeing it on screen. All are decisions, not gaps:
+
+- **Effect B is cut.** The scramble was built, composed through the scanline's
+  proxy exactly as `ANIMATIONS.md` §3 requires, and then removed: the beam alone
+  is the effect and the churn read as noise on top of it. §3's shared-proxy
+  argument existed only to stop A and B reading as a queue, and with one effect
+  there is no queue. Do not re-add it as "the spec says so" — the spec was
+  followed, and the result was rejected on sight.
+- **Every beat of the sweep is 1.5x the spec's**, ~1.77s rather than ~1.18s. At
+  1.0s the beam crossed a short section faster than the eye tracks it. The four
+  constants scale together or the beam fades out somewhere other than the end of
+  its own travel.
+- **Bypass sweeps.** `ANIMATIONS.md` §5 has it jumping straight to `unlocked`
+  with no beam; it now runs the same sweep the solves do, staggered 80ms apart
+  to match `PLAN.md` §3's bypass run. A section already `unlocked` is never
+  swept, so bypass cannot replay a reveal somebody earned. **Bypass off is
+  unchanged and stays instant** — going back is not a payoff and should not be
+  paced like one.
 
 ---
 
