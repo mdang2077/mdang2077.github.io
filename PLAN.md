@@ -180,13 +180,34 @@ A full-width band between the topbar and the two-column shell, so
 `MARTIN [lock] DANG` spans both columns. The sidebar's old `<h1>` is gone — the
 lockup is the document's only `h1` and the name is not duplicated.
 
-One token drives both sizes: `--hero-size` is the type size, the lock is 1.5x
-it, and the stage is that divided by the 0.77 fill constant because the WebGL
-camera renders a square frame the lock only partly fills. The rig translates up
-to sit the lock's **body** on the type's optical centre — the shackle makes the
-object top-heavy and box-centring leaves it floating — and the band buys that
-headroom back as padding derived from the same token, since a transform does not
-affect layout.
+One token drives both sizes: `--hero-size` is the type size, `--lock-h` is
+**1.725x** it (the spec's 1.5 plus a 1.15 bump made on sight), and the stage is
+`--lock-h` divided by the 0.77 fill constant because the WebGL camera renders a
+square frame the lock only partly fills. The stage translates up to sit the
+lock's **body** on the type's optical centre — the shackle makes the object
+top-heavy and box-centring leaves it floating.
+
+**The band's two ends are deliberately not symmetric**, and the difference is
+why the lockup used to sit visibly high in it. A transform does not affect
+layout, so the top buys the translate back as padding; but the visible lock also
+begins `0.1494 * --lock-h` below its own box's top, because the box is square
+and the lock fills 77% of it. Netting those two against each other is exactly
+the extra term on `padding-block-end`, and it is what puts the *visible* lock
+and pins on the band's centre line rather than their layout boxes. Measured
+94/95 at 1440, 45/46 at 320.
+
+**`--hero-air` exists for one reason: the sweep is scrubbed across this band's
+exit from the viewport, so a taller band is a longer, slower sweep.** It adds
+roughly a quarter more scroll distance for the light to cross the metal — the
+range measured 311px before it and 391px after, at 1440.
+
+Two pieces of dead space sit between the lock's foot and the pins that no gap
+token can see: the square box the lock fills only 77% of, and the upward
+translate on top of it. Together they measured 50px against a 16px gap. A
+negative `margin-bottom` on the stage cancels both, so `.hero-band`'s `gap` is
+the distance you actually see. It lives on the stage rather than the pin rail so
+that it vanishes with the stage — a `display: none` element applies no margins,
+so the collapsed lockup needs no special case and no `:has()`.
 
 ---
 

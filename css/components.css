@@ -124,15 +124,30 @@
      here rather than on the stage because the band's headroom and
      the pin rail's offset both have to read it. */
   --hero-size: clamp(var(--display-md), 9vw, 92px);
-  --lock-h: calc(2.25 * var(--hero-size));
+  --lock-h: calc(1.725 * var(--hero-size));
 
-  /* The stage translates up to centre the lock's body on the type,
-     and a transform does not affect layout — so the band buys the
-     headroom back as padding, derived from the same token. */
-  padding:
-    calc(0.25 * var(--lock-h) + var(--space-8))
-    var(--space-7)
-    var(--space-8);
+  /* Air above and below, added for one reason: the shine sweep is
+     scrubbed across this band's exit from the viewport, so a taller
+     band is a longer, slower sweep. It buys roughly a quarter more
+     scroll distance for the light to cross the metal. */
+  --hero-air: calc(0.143 * var(--hero-size) + var(--space-3));
+  --hero-pad: calc(var(--space-8) + var(--hero-air));
+
+  /* The two ends are NOT symmetric, and the difference is the whole
+     reason the lockup used to sit high in the band.
+
+     The stage translates up to put the lock's *body* on the type's
+     optical centre, and a transform does not affect layout — so the
+     top buys that headroom back as padding. But the visible lock
+     also starts 0.1494 of --lock-h below its own box's top, because
+     the box is square and the lock fills 77% of it. Netting the two
+     against each other is what the bottom's extra term is: it makes
+     the *visible* lock and pins sit centred in the band rather than
+     their layout boxes. */
+  padding-block-start: calc(0.25 * var(--lock-h) + var(--hero-pad));
+  padding-block-end:
+    calc(0.1527 * var(--lock-h) + 0.055 * var(--hero-size) + var(--hero-pad));
+  padding-inline: var(--space-7);
   border-bottom: var(--border-hair) solid var(--border);
   display: flex;
   flex-direction: column;
@@ -441,14 +456,12 @@
    The lockup is the one thing on the page allowed to dominate a
    phone screen; the pins stay under it and shrink with it. */
 @media (max-width: 768px) {
-  /* Side padding tightens, but the top still has to buy back the
-     stage's translate — a flat value here let the shackle poke
-     above the band and under the sticky topbar at 768px. */
+  /* Only the base pad and the sides tighten; the block padding's
+     derivation is unchanged, because a flat value here let the
+     shackle poke above the band and under the sticky topbar. */
   .hero-band {
-    padding:
-      calc(0.25 * var(--lock-h) + var(--space-5))
-      var(--space-5)
-      var(--space-6);
+    --hero-pad: calc(var(--space-5) + var(--hero-air));
+    padding-inline: var(--space-5);
   }
 
   .lockup {
