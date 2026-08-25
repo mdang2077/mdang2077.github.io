@@ -73,7 +73,7 @@
 
 .hero-photo-glow {
   position: absolute;
-  inset: -20px;
+  inset: calc(var(--space-5) * -1);
   border-radius: var(--radius-2xl);
   background: radial-gradient(ellipse at center, var(--glow-md) 0%, transparent 70%);
   pointer-events: none;

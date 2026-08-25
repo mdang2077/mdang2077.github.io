@@ -1308,18 +1308,29 @@ of definitions in `tokens.css`.
 
 ### 3. Raw pixel literals
 
-`tokens.css`'s header claims it is the only file allowed to hold a raw
-pixel value; four other files hold about fifty. **Decided: swap only the
-literals that equal an existing token** (`12px` → `--space-3`, `16px` →
-`--space-4`, `20px` → `--space-5`, `24px` → `--space-6`, and so on), so
-the change is provably zero-diff visually.
+`tokens.css`'s header claimed it was the only file allowed to hold a raw
+pixel value; four other files held about fifty. **Decided: swap only the
+literals that equal an existing token**, so the change is provably
+zero-diff visually.
 
-Off-scale values (`14px`, `26px`, `36px`, `44px`, `92px`, and the
-optical nudges in the lock geometry) stay as literals and each gets a
-comment naming why it is off the scale. Snapping them to the nearest
-4px step was considered and rejected: it moves the hero lockup's optical
-centring, and a scale that is honoured by rounding the things it does
-not fit is not a scale.
+**Result: the sweep found one.** Resolving every px literal in a spacing
+property (`margin`, `padding`, `gap`, `inset`, `top/right/bottom/left`)
+against the 4px scale returns exactly one on-scale value —
+`.hero-photo-glow`'s `inset: -20px`, now
+`calc(var(--space-5) * -1)`. Phase 1 had already tokenised the rest;
+what survived did so because it is off the scale.
+
+So the deliverable changed shape. Instead of fifty swaps there is one,
+plus an honest header on `tokens.css`: the file owns colour and timing,
+the 4px scale owns space *between* components, and sizes *within* one
+are optically tuned and stay literal. The four families that remain —
+dot diameters, control padding, shell gutters, optical constants — are
+named there rather than annotated one by one, because a per-value
+comment would have had to invent a rationale for each.
+
+Snapping the off-scale values to the nearest step was considered and
+rejected: it moves the hero lockup's optical centring, and a scale
+honoured by rounding the things it does not fit is not a scale.
 
 ### 4. The mobile stack
 

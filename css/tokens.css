@@ -1,6 +1,34 @@
 /* ============================================================
    TOKENS — the only file in the codebase allowed to hold a
-   colour literal, a raw pixel value, or a timing constant.
+   colour literal or a timing constant.
+
+   Pixels are narrower than that, and the original claim that this
+   file held all of them was never true. The 4px scale governs the
+   space *between* components: margins, padding, gaps. It does not
+   govern sizes *within* one, and phase 7 swept the other four
+   stylesheets to confirm the split is clean — exactly one on-scale
+   value was still a literal (`.hero-photo-glow`'s inset) and it is
+   now `calc(var(--space-5) * -1)`. Everything still written in px
+   out there is off the scale on purpose, in four families:
+
+     dot diameters      5-10px — .id-dot, .social-dot, .progress-dot,
+                        .pulse. Optically matched to the type they
+                        sit beside; 8px and 12px both read wrong.
+     control padding    6/9px x 14/18px — .challenge-input,
+                        .submit-btn, .toggle-btn, .tag. Tuned so a
+                        12-13px mono line lands on a ~32px control.
+     shell gutters      14, 28, 36, 44px — the topbar, sidebar and
+                        main column. The sidebar's 376px width is
+                        not on the scale either; the gutters answer
+                        to it, not to the 4px step.
+     optical constants  92px hero clamp cap, 145.5px shackle pivot
+                        (LOCK_SPEC geometry), 200px grain tile,
+                        60px footer rule.
+
+   Rounding those to the nearest 4px step was considered in phase 7
+   and rejected: it moves the hero lockup's optical centring, and a
+   scale honoured by rounding the things it does not fit is not a
+   scale. Add a token when a value is spacing and lands on the step.
    ============================================================ */
 
 :root {
