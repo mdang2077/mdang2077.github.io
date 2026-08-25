@@ -169,11 +169,17 @@ function makeStudioEnv(THREE, renderer, light, fine) {
 
   const pmrem = new THREE.PMREMGenerator(renderer);
   pmrem.compileEquirectangularShader();
-  const env = pmrem.fromEquirectangular(texture).texture;
+
+  /* The *render target* is returned, not its texture. Disposing
+     the texture alone leaves the target allocated, which shows up
+     as two extra GPU textures per theme toggle and never comes
+     back. `pmrem.dispose()` frees the generator's own scratch
+     resources but not what it handed back. */
+  const target = pmrem.fromEquirectangular(texture);
   pmrem.dispose();
   texture.dispose();
 
-  return env;
+  return target;
 }
 
 export function createLockScene({ THREE, gsap, stage, theme, prefersReducedMotion }) {
@@ -420,6 +426,9 @@ export function createLockScene({ THREE, gsap, stage, theme, prefersReducedMotio
      look like a hole punched in the page. PMREM output is a GPU
      texture, so the previous one is disposed or it leaks on every
      toggle. */
+  let steelEnv = null;
+  let shellEnv = null;
+
   function applyTheme(next) {
     const light = next === 'light';
 
@@ -431,19 +440,21 @@ export function createLockScene({ THREE, gsap, stage, theme, prefersReducedMotio
     /* An additive white band on a near-white lock blows out; on
        paper it is barely there at all. */
     shineMat.opacity = tokenNumber('--lock-shine-opacity', light ? 0.28 : 0.5);
-    /* PMREM output is a GPU texture: dispose both or every theme
-       toggle leaks one. */
-    if (steel.envMap) steel.envMap.dispose();
-    if (shell.envMap) shell.envMap.dispose();
+    /* Dispose both targets before reassigning, or every theme
+       toggle leaks two GPU textures. */
+    if (steelEnv) steelEnv.dispose();
+    if (shellEnv) shellEnv.dispose();
 
-    steel.envMap = makeStudioEnv(THREE, renderer, light, false);
-    shell.envMap = makeStudioEnv(THREE, renderer, light, true);
+    steelEnv = makeStudioEnv(THREE, renderer, light, false);
+    shellEnv = makeStudioEnv(THREE, renderer, light, true);
+
+    steel.envMap = steelEnv.texture;
+    shell.envMap = shellEnv.texture;
     steel.needsUpdate = true;
     shell.needsUpdate = true;
 
-    /* Anything without its own envMap — the keyhole recess — falls
-       back to this. */
-    scene.environment = steel.envMap;
+    /* Anything without its own envMap falls back to this. */
+    scene.environment = steelEnv.texture;
   }
 
   applyTheme(theme);
@@ -510,8 +521,8 @@ export function createLockScene({ THREE, gsap, stage, theme, prefersReducedMotio
       running = false;
       io.disconnect();
       window.removeEventListener('resize', resize);
-      if (steel.envMap) steel.envMap.dispose();
-      if (shell.envMap) shell.envMap.dispose();
+      if (steelEnv) steelEnv.dispose();
+      if (shellEnv) shellEnv.dispose();
       shineTex.dispose();
       renderer.dispose();
       canvas.remove();

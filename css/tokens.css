@@ -82,7 +82,6 @@
   --dur-flight:  520ms;   /* [ unlocked ] glyph -> hero pin */
   --dur-seat:    180ms;   /* pin seating pop */
   --dur-type:     28ms;   /* per character, run console */
-  --dur-idle-p: 5s;       /* one ambient --p pass at rest */
 
   --ease-standard: ease;
   --ease-out:      cubic-bezier(0.22, 1, 0.36, 1);
@@ -143,14 +142,6 @@
   --dark-pulse-ring-1:  rgba(255, 255, 255, 0.05);
   --dark-pulse-ring-2:  rgba(255, 255, 255, 0.04);
 
-  /* Chrome. The lock is the one object on the page that does not
-     take the accent: a mirror finish that glows green is a green
-     plastic padlock. The extreme value range is what makes it read
-     as metal, so hi and lo are pushed to the ends deliberately. */
-  --dark-metal-hi:  #f4f7f5;
-  --dark-metal-mid: #7d8a84;
-  --dark-metal-lo:  #0d1512;
-  --dark-lock-contour: transparent;
 
   /* The WebGL lock's lighting and materials. They live here rather
      than as hex literals in js/lock3d.js so the lock re-themes
@@ -158,10 +149,9 @@
      with the emissive flash cut, the lock carries no colour at all.
 
      Body and shackle are BOTH polished chrome. LOCK_SPEC §1 has
-     the body as dark gunmetal and says not to raise it — that was
-     tried, and the flat gunmetal face read as plastic next to the
-     SVG lock's hard mirror banding. The two finishes now differ by
-     tone rather than by material. */
+     the body as dark gunmetal and marks it locked — that was
+     built, and the flat gunmetal face read as plastic. The two
+     finishes now differ by tone rather than by material. */
   --dark-lock-shell:  #c2ccd8;   /* body — chrome, one step cooler */
   --dark-lock-steel:  #dfe5ee;   /* shackle — mirror chrome */
   --dark-lock-rim:    #9fc4ff;
@@ -210,15 +200,6 @@
   --light-pulse-ring-1:  rgba(0, 0, 0, 0.06);
   --light-pulse-ring-2:  rgba(0, 0, 0, 0.05);
 
-  /* Brushed steel on paper, not a black hole punched in the page:
-     highlights compress toward off-white, mids drop ~30%, and the
-     core shadow is a warm dark grey rather than black. --metal-hi
-     sits close to --light-bg, so the light theme alone gets a
-     hairline contour to keep the silhouette from dissolving. */
-  --light-metal-hi:  #e9e5dc;
-  --light-metal-mid: #58605b;
-  --light-metal-lo:  #3a3f3c;
-  --light-lock-contour: rgba(58, 63, 60, 0.5);
 
   /* On paper the whole lock compresses toward off-white and leans
      on the cast shadow and the dark side of its own banding to
@@ -274,10 +255,6 @@
   --lock-hemi-intensity:  var(--dark-lock-hemi-intensity);
   --lock-shine-opacity:   var(--dark-lock-shine-opacity);
 
-  --metal-hi:      var(--dark-metal-hi);
-  --metal-mid:     var(--dark-metal-mid);
-  --metal-lo:      var(--dark-metal-lo);
-  --lock-contour:  var(--dark-lock-contour);
 
   --scanline:      var(--dark-scanline);
   --grain-opacity: var(--dark-grain-opacity);
@@ -347,23 +324,11 @@
 @property --accent-s { syntax: '<percentage>'; inherits: true; initial-value: 100%; }
 @property --accent-l { syntax: '<percentage>'; inherits: true; initial-value: 60%; }
 
-/* The lock's lighting scalar. 0 = light hard left, 1 = hard right;
-   every highlight, shade and cast shadow on the padlock derives
-   from it, so the object relights coherently instead of a
-   highlight sliding across a static image. Registered because an
-   unregistered custom property is a string and will not
-   interpolate — the CSS-only idle loop in motion.css depends on
-   this, and so does any transition on it.
-
-   `--p-nudge` is a second, additive channel. The scroll scrub owns
-   `--p` outright; phase 4's unlock timeline writes the nudge
-   instead, so the two drivers can never overwrite each other. */
-@property --p       { syntax: '<number>'; inherits: true; initial-value: 0.5; }
-@property --p-nudge { syntax: '<number>'; inherits: true; initial-value: 0; }
-
-/* The shackle's two unlock channels, shared between the visible
-   shackle group and its copy inside the lighting mask so the two
-   can never drift apart. Registered so phase 4 can tween them. */
+/* The section badges' two shackle channels. The hero lock does not
+   use them — it swings its shackle in three dimensions about a
+   pivot group — but the badges open with a plain CSS rotate and
+   these are what carry it. Registered so a tween is possible and
+   so an invalid value cannot poison the whole transform. */
 @property --shackle-lift   { syntax: '<number>'; inherits: true; initial-value: 0; }
 @property --shackle-rotate { syntax: '<angle>';  inherits: true; initial-value: 0deg; }
 
@@ -422,10 +387,6 @@
     --lock-hemi-intensity:  var(--light-lock-hemi-intensity);
     --lock-shine-opacity:   var(--light-lock-shine-opacity);
 
-    --metal-hi:      var(--light-metal-hi);
-    --metal-mid:     var(--light-metal-mid);
-    --metal-lo:      var(--light-metal-lo);
-    --lock-contour:  var(--light-lock-contour);
 
     --scanline:      var(--light-scanline);
     --grain-opacity: var(--light-grain-opacity);
@@ -481,10 +442,6 @@
   --lock-hemi-intensity:  var(--light-lock-hemi-intensity);
   --lock-shine-opacity:   var(--light-lock-shine-opacity);
 
-  --metal-hi:      var(--light-metal-hi);
-  --metal-mid:     var(--light-metal-mid);
-  --metal-lo:      var(--light-metal-lo);
-  --lock-contour:  var(--light-lock-contour);
 
   --scanline:      var(--light-scanline);
   --grain-opacity: var(--light-grain-opacity);

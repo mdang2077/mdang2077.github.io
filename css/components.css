@@ -143,8 +143,17 @@
   overflow: visible;
 }
 
+/* `1fr auto 1fr`, not a centred flex row. Centring the row puts
+   the row's midpoint on the page axis, and MARTIN is two glyphs
+   wider than DANG — so the lock ended up half that difference
+   right of centre, which measured 40px at the 92px ceiling. Equal
+   side columns make the middle cell the centre whatever the words
+   weigh, and the pins below (centred by the column) then line up
+   with the lock structurally rather than by luck. Make the lockup
+   asymmetric again and the pins drift silently. */
 .lockup {
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
   align-items: center;
   justify-content: center;
   gap: clamp(var(--space-3), 2.5vw, var(--space-6));
@@ -156,34 +165,48 @@
   letter-spacing: var(--tracking-xl);
 }
 
+/* Both words tuck against the lock rather than being flung out to
+   the margins by their oversized tracks.
+
+   The column is stated explicitly on all three children, and that
+   is load-bearing: a `display: none` grid item is removed from
+   flow rather than leaving its track empty, so without this DANG
+   slides up into the middle cell whenever the lock is absent and
+   the lockup goes visibly off-axis. With the placement fixed, the
+   middle track collapses to zero on its own and the two words
+   close up around the page centre. */
 .lockup-word {
   color: var(--text);
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.lockup-word:first-child {
+  grid-column: 1;
+  text-align: right;
 }
 
 .lockup-word--accent {
+  grid-column: 3;
   color: var(--accent);
+  text-align: left;
   text-shadow: 0 0 24px var(--text-glow);
   transition: var(--transition-accent);
 }
 
 /* ── THE LOCK ────────────────────────────────────────────────
-   Chrome, not accent. The lock is the one neutral object in a
-   coloured frame, which is what makes it read as a physical thing
-   sitting on the page rather than another piece of UI. It still
-   signals state — by opening, which says more than a hue change.
-
-   The stage holds both renderings. It is square because the WebGL
-   camera renders a square frame and the lock fills only ~77% of
-   it: sizing the canvas to 1.5x the type would yield a lock that
-   looks about 1.15x, so the box is divided by that fill constant.
-   If the camera's fov or z ever changes, 0.77 must be re-measured
-   in the same sitting. The SVG shares the box, so the swap resizes
-   nothing. */
+   The stage holds the WebGL canvas and nothing else. It is square
+   because the camera renders a square frame the lock fills only
+   ~77% of: sizing the canvas to 1.5x the type would yield a lock
+   that looks about 1.15x, so the box is divided by that fill
+   constant. If the camera's fov or z ever changes, 0.77 has to be
+   re-measured in the same sitting. */
 .lock-stage {
   --lock-h: calc(1.5 * var(--hero-size));
 
   position: relative;
   display: block;
+  grid-column: 2;
   flex: none;
   width: calc(var(--lock-h) / 0.77);
   aspect-ratio: 1;
@@ -191,30 +214,26 @@
   /* Centre the lock's *body* on the type, not the box: the shackle
      makes the object top-heavy and box-centring leaves it floating
      above the letterforms. 0.37em up puts the body centre on the
-     type centre (it lands within a hair of the same place for both
-     renderings); 0.055em back down is the VT323 cap-height nudge
-     from phase 3. Verify optically — the spec is explicit that
-     this and the 1.5 are a starting point and the eye decides. */
+     type centre; 0.055em back down is the VT323 cap-height nudge
+     from phase 3. */
   transform: translateY(calc(-0.315 * var(--hero-size)));
 }
 
-/* Both renderings sit centred in the square, superimposed, so the
-   cross-fade has nothing to move. */
-.lock-stage > * {
-  position: absolute;
-  inset: 0;
-  margin: auto;
+/* The reserved box, held from first paint so the canvas arriving
+   shifts nothing. `:empty` is doing real work here — the stage has
+   no whitespace inside it in the markup for exactly this reason. */
+.lock-stage:empty {
+  display: block;
 }
 
-.lock-svg--hero {
-  height: var(--lock-h);
-  width: calc(var(--lock-h) * 180 / 264);
-  overflow: visible;
-  transition: opacity var(--dur-theme) var(--ease-standard);
+/* Set by js/lock.js once it knows no scene is coming: no WebGL, no
+   Three, or an init failure. Collapsing the middle grid column
+   closes the lockup up to MARTIN DANG, which reads as intentional
+   rather than as a hole. */
+.lock-stage[data-lock-3d="off"] {
+  display: none;
 }
 
-/* js/lock3d.js appends this and fades it in once the scene has
-   rendered its first frame. Until then it does not exist. */
 .lock-stage canvas {
   display: block;
   width: 100%;
@@ -223,115 +242,17 @@
   transition: opacity var(--dur-theme) var(--ease-standard);
 }
 
-.lock-stage[data-lock-3d="on"] canvas   { opacity: 1; }
-.lock-stage[data-lock-3d="on"] .lock-svg--hero { opacity: 0; }
-
-/* ── SVG MATERIAL ────────────────────────────────────────────
-   Gradient stops take their colour from here rather than from a
-   presentation attribute, which would not resolve var(). This is
-   also what lets the lock re-theme with no JS at all. */
-.stop-hi  { stop-color: var(--metal-hi); }
-.stop-mid { stop-color: var(--metal-mid); }
-.stop-lo  { stop-color: var(--metal-lo); }
-
-.lock-svg--hero .body-metal { fill: url(#lock-ramp); }
-
-.lock-svg--hero .shackle-metal {
-  fill: none;
-  stroke: url(#lock-ramp);
-  stroke-width: 22;
-  /* butt, not round: a machined shackle has flat-cut ends, and the
-     legs run 14 units into the body so the cuts never show. */
-  stroke-linecap: butt;
+.lock-stage[data-lock-3d="on"] canvas {
+  opacity: 1;
 }
 
-.lock-svg--hero .body-bevel {
-  fill: none;
-  stroke: var(--metal-hi);
-  stroke-width: 1.5;
-  opacity: 0.9;
-}
-
-.lock-svg--hero .shackle-spec {
-  fill: none;
-  stroke: var(--metal-hi);
-  stroke-width: 5;
-  stroke-linecap: round;
-  opacity: 0.85;
-}
-
-.lock-svg--hero .shackle-spec-2 {
-  fill: none;
-  stroke: var(--metal-hi);
-  stroke-width: 3;
-  stroke-linecap: round;
-  opacity: 0.45;
-}
-
-/* The keyhole cuts clean through to the page, never to black, so
-   it works in both themes. .hero-band has to stay transparent or
-   the cut shows the wrong colour. */
-.lock-svg--hero .keyhole-cut { fill: var(--bg); }
-
-.lock-svg--hero .keyhole-rim {
-  fill: none;
-  stroke: var(--metal-hi);
-  stroke-width: 1.25;
-  stroke-linecap: round;
-  opacity: 0.75;
-}
-
-/* Light theme only — --lock-contour is transparent in dark. */
-.lock-contour {
-  fill: none;
-  stroke: var(--lock-contour);
-}
-
-/* ── SVG LIGHTING ────────────────────────────────────────────
-   Three layers, deliberately, not the prototype's four: this is
-   the fallback path now, and its target is "reads as metal,
-   relights with scroll, nobody thinks it is broken". The warm
-   diffuse wash and the animated cast shadow were the two layers
-   with the worst effort-to-visibility ratio on a path most
-   visitors never see, so they are cut.
-
-   --p is written by the scroll scrub; --p-nudge is reserved for
-   phase 4's unlock so the two drivers are never on the same
-   channel and cannot overwrite each other. */
-.lock-stage {
-  --p-eff: clamp(0, calc(var(--p) + var(--p-nudge)), 1);
-}
-
-.lock-spec-layer {
-  pointer-events: none;
-  mix-blend-mode: screen;
-}
-
-/* The lit edge *becomes* the shadowed edge as the light crosses
-   p = 0.5. Cheapest and most convincing part of the model — if
-   these do not visibly swap sides, the clamp() signs are backwards
-   and the whole lighting model is inert. */
-.body-edge-l {
-  fill: var(--metal-hi);
-  opacity: clamp(0, calc((0.5 - var(--p-eff)) * 2), 1);
-}
-
-.body-edge-r {
-  fill: var(--metal-lo);
-  opacity: clamp(0, calc((var(--p-eff) - 0.5) * 2), 1);
-}
-
-/* The hinge pin — base of the shackle's right leg, viewBox
-   coordinates, matching LOCK_SPEC §1. `view-box` keeps the origin
-   in viewBox units rather than bounding-box fractions, which is
-   what makes the number readable.
-
-   The visible shackle, its copy inside the lighting mask and the
-   badges all carry this class, so nothing can drift from anything
-   else. The SVG unlock is a plain CSS rotate about this point —
-   no pop, no tumbler turn. That reads as "the lock opened", which
-   is all the fallback owes anyone; the sideways swing that makes
-   the 3D version worth having cannot be faked here. */
+/* The hinge pin — base of the shackle's right leg, in the badge
+   viewBox's own coordinates, matching LOCK_SPEC §1. `view-box`
+   keeps the origin in viewBox units rather than bounding-box
+   fractions, which is what makes the number readable. Only the
+   badges use this now; the hero lock swings its shackle in three
+   dimensions about a pivot group, which is the whole reason it is
+   WebGL. */
 .shackle-rig {
   transform-box: view-box;
   transform-origin: 145.5px 150px;
@@ -360,7 +281,6 @@
   --shackle-rotate: 0deg;
   --shackle-lift: 0;
 
-  position: static;
   height: 1.15em;
   width: auto;
   flex: none;
@@ -506,13 +426,8 @@
     padding: var(--space-7) var(--space-5) var(--space-6);
   }
 
-  /* At 320px the two words plus a lock 1.5x their height do not
-     fit one line. The lock does not shrink below 1.5x — it is the
-     hero — so the lockup wraps instead, and the lock stays between
-     the two words in reading order. */
   .lockup {
     letter-spacing: var(--tracking-lg);
-    flex-wrap: wrap;
   }
 
   /* The badge is wider than the bare `[ locked ]` text it replaced,

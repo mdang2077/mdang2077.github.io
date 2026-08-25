@@ -31,25 +31,6 @@
   animation: unlock-flash var(--dur-flash) var(--ease-out);
 }
 
-/* ── LOCK IDLE — CSS FALLBACK ────────────────────────────────
-   The real driver is the scroll scrub in js/lock.js. This is what
-   runs when GSAP never arrives (CDN blocked, offline): a slow
-   ambient pass of the light across the lock, no scroll link.
-   main.js stamps data-gsap="on" as soon as the library is
-   confirmed, so this rule is inert on the normal path.
-
-   It is four lines because --p is a registered property: plain CSS
-   can interpolate it, and every highlight, shade and shadow on the
-   lock is derived from it. */
-@keyframes lock-idle-p {
-  0%, 100% { --p: 0.35; }
-  50%      { --p: 0.65; }
-}
-
-:root:not([data-gsap="on"]) .lock-stage {
-  animation: lock-idle-p var(--dur-idle-p) var(--ease-in-out) infinite;
-}
-
 /* ── THEME SWAP ──────────────────────────────────────────────
    The crossfade exists only while a swap is in flight: theme.js
    adds the class, flips the attribute, then drops the class. No
@@ -119,19 +100,15 @@
   .progress-dot,
   .reveal.is-visible,
   .challenge-input.is-wrong,
-  .run-log-cursor,
-  .lock-stage {
+  .run-log-cursor {
     animation: none !important;
   }
 
-  /* Neutral front lighting, pinned. js/lock.js checks the same
-     query once and never registers the scrub or the idle loop, so
-     this only has to cover the CSS fallback path — but it also
-     guarantees the lock is lit rather than left at --p's initial
-     value if both paths are off. */
-  .lock-stage {
-    --p: 0.5;
-  }
+  /* The lock's own reduced-motion handling is in js/lock.js and
+     js/lock3d.js: lights parked neutral, no scrub, no idle, no
+     float, and the unlock snapped to its current state rather than
+     tweened. None of it is reachable from CSS — the scene is not
+     in the cascade. */
 
   /* Beats the theme-swap rule's own !important. theme.js also
      declines to add the class, so this is belt and braces. */

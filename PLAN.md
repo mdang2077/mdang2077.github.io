@@ -10,9 +10,7 @@ committable, deployable site. Branch: `feat/v3-motion`. Never commit to `main`.
 | 0 | Asset pipeline + repo scaffolding | **done** |
 | 1 | Restructure + tokens, zero visual change | **done** |
 | 2 | Dark/light theme toggle | **done** |
-| 3 | Hero name lockup + scroll shine (must ship the phase-4 hooks below) | **done** |
-| 3R-a | **Lock rebuild (SVG)** — new geometry, metal tokens, `--p` lighting, badges | **done** |
-| 3R-b | **Lock upgrade (WebGL)** — Three.js scene, 3D unlock, scroll shine | **done** |
+| 3 | Hero lock — WebGL padlock, scroll shine, 3D unlock | **done** |
 | 4 | Unlock system — run log + pin rail + hero lock + bypass relock | todo |
 | 5 | Approved extras | todo |
 | 6 | Polish + full audit | todo |
@@ -38,8 +36,8 @@ js/
   ctf.js              challenge logic, unlock state, progress, bypass
   theme.js            dark/light toggle, persistence, view-transition reveal
   animations.js       phase 4 — GSAP timelines + ScrollTrigger
-  lock.js             orchestrator — capability check, path selection, SVG --p controller
-  lock3d.js           phase 3R-b — the Three.js hero lock scene
+  lock.js             orchestrator — capability check, scroll scalar, lock state machine
+  lock3d.js           the Three.js hero lock scene
   hud.js              phase 3 markup / phase 4 behavior — run log + hero pins
 ```
 
@@ -162,66 +160,263 @@ surface the semi-transparent id-card and sticky topbar composite over. 24
 theme assertions and 38 functional assertions pass. Dark was diffed
 element-by-element against phase 1: identical but for `--text-muted`.
 
-## Phase 3 notes
+## Phase 3 — the hero lock
 
-**The lockup.** A full-width band between the topbar and the two-column
-shell, so `MARTIN [lock] DANG` spans both columns. The sidebar's `<h1>` is
-gone — the lockup is now the document's only `h1`, and the name is not
-duplicated. The lock is sized to `0.98em` and nudged `0.055em` down so its
-body aligns to VT323's cap band rather than the baseline.
+One phase, one lock. The hero padlock is a **Three.js WebGL scene** and there is
+no second rendering of it. Earlier drafts of this phase specified an SVG
+padlock — first with a mask sweep, later with chrome gradients and a `--p`
+lighting model — and both are gone from this plan. `LOCK_SPEC.md` remains the
+authority on form and behaviour; where the shipped code and the spec disagree,
+the code is right and the deviation is listed below.
 
-**The lock SVG.** Hand-authored, 64x92 viewBox, ~1.6KB of markup. Shackle and
-body live in separate `<g>`s; every shape is declared once under an id and
-re-used by `<use>`, including inside the shine mask — so the mask tracks the
-shackle when phase 4 opens it, instead of drifting away from it. The hinge pin
-is viewBox (46, 48), written into both the SVG and `.lock-shackle-group`.
-`transform-box: view-box` keeps that origin in viewBox units, which is the
-only reason the number is readable. 16 units of empty viewBox sit above the
-shackle's resting arc, enough for the specced -32deg swing plus the 3px lift.
+**Status: done.** Built in `3ce01db`, `a9f2924`, `52b85f2`; §4's two remaining
+changes landed after that. §4 is kept as the record of what was removed and why.
 
-**The shine is a real mask sweep.** A 16-unit-wide gradient band (25% of the
-lock's width, tilted 20deg) travels across a rect that is masked by the lock's
-own geometry, so light never touches the background. Its x is set as an SVG
-*attribute*, never as a GSAP transform: GSAP writes SVG transforms to the CSS
-`transform` property, which replaces the element's transform attribute
-outright and would silently drop the tilt.
+---
 
-**Scroll vs. idle.** ScrollTrigger scrubs the band across the hero's
-scroll-out at `scrub: 0.6`; before any scroll, an ambient loop sweeps every 5s
-at 35% intensity so the effect is discoverable at rest. First scroll input
-cancels the idle loop and it does not return. `sweep({ intensity, duration })`
-is exported for phase 4's unlock flash, and suspends/restores the idle loop
-around itself.
+### 1. The lockup band
 
-**On `animation-timeline: view()`.** Evaluated as the brief asked, and not
-used. It could carry the scroll link, but the effect here is not a silent
-no-op when it degrades: with no fallback the band parks at one end and the
-lock reads as permanently half-lit, which is worse than no shine. GSAP is
-already loaded for phase 4 regardless, so the native path buys nothing.
+A full-width band between the topbar and the two-column shell, so
+`MARTIN [lock] DANG` spans both columns. The sidebar's old `<h1>` is gone — the
+lockup is the document's only `h1` and the name is not duplicated.
 
-**Degradation.** GSAP is a progressive enhancement, never a dependency.
-`main.js` stamps `data-gsap="on"` only once `window.gsap` is confirmed; absent
-that, `motion.css` runs a CSS-only ambient sweep and the page is otherwise
-identical. Verified by resolving `cdn.jsdelivr.net` into a dead port.
+One token drives both sizes: `--hero-size` is the type size, the lock is 1.5x
+it, and the stage is that divided by the 0.77 fill constant because the WebGL
+camera renders a square frame the lock only partly fills. The rig translates up
+to sit the lock's **body** on the type's optical centre — the shackle makes the
+object top-heavy and box-centring leaves it floating — and the band buys that
+headroom back as padding derived from the same token, since a transform does not
+affect layout.
 
-**Phase-4 hooks, all shipped inert.** `@property` registration for the accent
-channels (they snap without it), `--dur-flight/-seat/-type`, `--z-flight`
-below the topbar for the flight clone, the three-state pin CSS, the reserved
-four-line console, and `ctf:state` — which `ctf.js` now dispatches with
+---
+
+### 2. The lock
+
+`js/lock3d.js` owns the scene; `js/lock.js` orchestrates and owns the state
+machine. Geometry derives from four constants (`BW`, `BH = BW*0.74`, `TUBE`,
+`ARC`), so retuning means editing constants rather than scaling the group.
+
+**The environment map is the material.** `MeshStandardMaterial` at
+`metalness: 1` has nothing to reflect without one and renders flat and dark *no
+matter how far light intensity is raised* — and raising it is the obvious wrong
+instinct. The procedural studio env supplies the reflection, and **the vertical
+bars are the mechanism**: a flat metal face mirrors them as the hard banding
+that reads as polished chrome. Smooth them into a gradient and the lock is grey
+plastic.
+
+**Two environments, and this was a real discovery — keep it.** `makeStudioEnv`
+takes a `fine` flag and builds two: a 26px repeating ramp for the body's flat
+face, wide softboxes for the shackle's tube. The reason is angular coverage. A
+flat face at this camera distance reflects only ~35° of the environment, about
+50px of a 512px map, so wide bars leave it a mirror with nothing to mirror. The
+tube is the opposite — its curvature sweeps the whole map in a few screen
+pixels, so fine bars alias into ringing. One environment cannot serve both, so
+each material carries its own.
+
+**The scroll shine moves lights and one texture offset, nothing else:**
+
+```js
+key.position.x    = -6 + p * 12;
+rim.position.x    =  6 - p * 12;
+shineTex.offset.x = (0.5 - p) * 1.7;   // 1.7 carries the band fully off both edges
+```
+
+**The ScrollTrigger range was corrected, and the correction is right.**
+`LOCK_SPEC.md` §4 says `top bottom -> bottom top`, which suits an element part
+way down the page. The hero is the *first* thing on the page, so that range is
+~70% consumed before the visitor scrolls a pixel and they would only ever see
+the tail of the sweep. The code measures from the band's own top instead
+(`start: 'top top'`, `end: 'bottom top'`), so the full pass happens across the
+hero's exit and runs backwards on the way up. **No pin, no sticky** — the page
+scrolls at normal speed throughout.
+
+**Idle** is a raised cosine starting and ending exactly on the scrub's resting
+value, so the handover has nothing to jump from. First scroll input kills it
+permanently: an ambient loop under a reader's cursor is noise.
+
+**Battery.** The rAF loop is gated on an `IntersectionObserver` over the stage
+and on `document.hidden`. The only idle motion is a 0.02-unit vertical float;
+the lock never spins.
+
+---
+
+### 3. Approved deviations from `LOCK_SPEC.md`
+
+Deliberate, approved, and **all of them belong in the commit message** so nobody
+reads the spec later and "fixes" them back.
+
+| # | Deviation | Why |
+|---|---|---|
+| 1 | **Both parts are chrome** — no dark-gunmetal body, despite §1 marking that locked | Reads better. Approved on sight. |
+| 2 | **The tumbler and its key-turn beat are cut** | The keyhole is a hole in the body now, so there is nothing to rotate. Retires the spec's parenting bug entirely. |
+| 3 | **The cast shadow is cut** | The `ShadowMaterial` floor earned nothing against a dark ground. |
+| 4 | **The green emissive flash (beat 5) is cut** | The lock is neutral metal and signals state by *opening*. Also deletes the `Color.setStyle()` failure on our space-separated `hsl(h s l)` tokens — no emissive, nothing to parse. |
+| 5 | **The lock opens once, when all three puzzles are complete** — not per challenge as §3 says | Firing a mechanism three times spends the payoff before it means anything. The pin rail carries per-solve feedback. |
+| 6 | **No SVG fallback rendering** (§4) | User decision. `LOCK_SPEC.md` §6 requires one; we are not shipping it. |
+
+**The unlock is three beats, not five**, with the spec's spacing preserved and
+shifted 0.36s earlier so the mechanism starts on the first frame rather than
+after the gap the key turn used to fill:
+
+| # | Beat | Target | Value | Start | Duration | Ease |
+|---|---|---|---|---|---|---|
+| 1 | body recoils | `body.position.y` | `-0.04`, yoyo x1 | 0.00 | 0.07 | `power1.inOut` |
+| 2 | shackle pops | `pivot.position.y` | `0.4` | 0.06 | 0.30 | `back.out(2.4)` |
+| 3 | shackle swings | `pivot.rotation.y` | `-1.2` rad | 0.30 | 0.60 | `power3.out` |
+
+Beat 3 is the payoff and the whole reason the lock is 3D: a `pivot` group at the
+right leg with the shackle offset back inside it, so `rotation.y` swings it out
+*sideways in depth*. `-1.2` rad (~69°) rather than the prototype's `-1.9`, which
+put the shackle edge-on and read as a thin rod.
+
+Relock reverses at `timeScale(1/0.7)` — mechanisms close faster and harder than
+they open. Only bypass-off reaches it.
+
+---
+
+### 4. Remaining work
+
+#### 4a. Delete the SVG lock — done
+
+The WebGL lock is the only rendering. Everything belonging to the SVG hero lock
+comes out of the codebase — not hidden, not gated, **removed**.
+
+**One carve-out, and it is not optional.** All three section badges
+`<use href="#lock-shackle-path">`, `#lock-body-path` and `#lock-keyhole-path`,
+and those three shapes are declared inside the hero SVG's `<defs>`
+(`index.html:95-97`). Deleting the hero SVG outright empties every badge.
+
+Move exactly those three shapes into a standalone hidden sprite near the top of
+`<body>`:
+
+```html
+<svg class="lock-sprite" width="0" height="0" aria-hidden="true" focusable="false">
+  <defs>
+    <path id="lock-shackle-path" .../>
+    <rect id="lock-body-path"    .../>
+    <path id="lock-keyhole-path" .../>
+  </defs>
+</svg>
+```
+
+That is shared badge geometry, not a lock rendering. Everything else goes.
+
+**What to remove:**
+
+| File | Remove |
+|---|---|
+| `index.html` | the whole `<svg class="lock-svg--hero">`: `<title>`, `#lock-ramp`, `#lock-spec`, `#lock-silhouette`, `#lock-body-clip`, the shackle group and its highlight paths, the body group, bevel, edge rects, the specular layer |
+| `css/components.css` | `.lock-svg--hero`, the SVG material block (`.stop-*`, `.body-metal`, `.body-bevel`, `.body-edge-l/-r`, `.shackle-metal`, `.shackle-spec*`), and the `[data-lock-render="svg"]` rules |
+| `js/lock.js` | the `spec` / `title` / `svg` lookups, the SVG branch of `applyLight()`, the `--shackle-rotate` and `--shackle-lift` painting, and the whole SVG-path fallback |
+| `css/motion.css` | the CSS-only `--p` idle sweep (it existed to light the SVG without GSAP) |
+| `css/noscript.css` | the `.lock-stage` lock rules |
+| `css/tokens.css` | `@property --p` — nothing reads it once the SVG is gone; WebGL takes the scalar directly in JS |
+
+**Audit rather than assume:** the metal tokens (`--metal-hi/-mid/-lo`) may be
+referenced by the badge dress. Keep whatever the badges actually use and delete
+the rest — check before cutting.
+
+**Accepted consequence: with no WebGL, and with JS off, there is no lock.** No
+old hardware fallback, no GPU-blocklist fallback, no no-JS lock. The stage
+collapses and the lockup closes up to `MARTIN DANG` — with the grid in 4b an
+empty middle column collapses on its own, so this reads as intentional rather
+than as a hole. Contacts, identity and all content remain reachable in every one
+of those cases, which is the constraint that actually matters.
+
+Accessibility follows the canvas: `lock.js` already puts `role="img"` and a
+state-tracking `aria-label` on it. With no canvas there is no lock and nothing
+to announce, which is correct.
+
+#### 4b. Put the lock on the page axis — done
+
+Measured before the change at 1440px: page axis 720, lock centre **759.8** — off
+by 39.8px. `MARTIN` is 238.8px against `DANG`'s 159.2px, and half that 79.6px
+difference is exactly the 39.8px offset, so the diagnosis below was right on the
+nose. After: lock centre 720, pin rail centre 720.
+
+`.lockup` is a centred flex row of `MARTIN` + lock + `DANG`. The *row* is
+centred, so the row's midpoint lands on the page axis — but `MARTIN` is two
+glyphs wider than `DANG`, so the lock sits right of centre by half that
+difference. At the 92px ceiling that is visible, not a hairline. The pin rail is
+a separate child centred by the column, so it *is* on the axis — which is
+exactly why the pins do not sit under the lock.
+
+Give the words equal slots so the middle cell is the centre:
+
+```css
+.lockup {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: clamp(var(--space-3), 2.5vw, var(--space-6));
+}
+.lockup-word             { min-width: 0; white-space: nowrap; }
+.lockup-word:first-child { text-align: right; }   /* MARTIN, toward the lock */
+.lockup-word--accent     { text-align: left;  }   /* DANG,   toward the lock */
+```
+
+`1fr auto 1fr` states the intent directly: the middle column *is* the centre,
+whatever the words weigh. The `1fr` slots absorb the difference and the
+`text-align` keeps both words tucked against the lock rather than flung to the
+margins.
+
+**One trap, found by measuring rather than by looking.** The column has to be
+stated explicitly on all three children (`grid-column: 1 / 2 / 3`). A
+`display: none` grid item is removed from flow rather than leaving its track
+empty, so with implicit placement `DANG` slides up into the middle cell the
+moment the lock is absent — and the lockup goes *further* off-axis than before
+the fix, in exactly the no-WebGL case this was supposed to make tidy. With the
+placement pinned, the middle track collapses to zero on its own and the two
+words close up symmetrically about the page centre, one gap either side of an
+empty column.
+
+**Mobile needed nothing.** Measured at 320 / 375 / 768: no word-to-lock
+collision at any of them, no overflow, and the lock centred at every width
+(160/160, 187/187.5, 384/384). The stacking fallback below was not built —
+there is no width at which it fires.
+
+**This centres the lock, not merely its box** — worth confirming rather than
+assuming, since the stage is a square canvas the lock fills only ~77% of. The
+scene is built symmetrically about `x = 0` with the camera on that axis, so
+centring the stage centres the lock. Vertical centring is already handled by the
+rig's `translateY`.
+
+**The pins then align for free** — but say so in a comment. The alignment is
+structural rather than coincidental, and if the lockup is ever made asymmetric
+again the pins drift silently, which is a hard bug to see.
+
+**Mobile:** at 320-375px the `1fr` slots can squeeze the words against the lock.
+If they collide, collapse to one column and stack — the lock stays centred and
+the pins still line up, so the degradation is clean.
+
+---
+
+### 5. Also shipped in this phase
+
+**Phase-4 hooks, all inert.** `@property` registration for the accent channels
+(they snap without it), `--dur-flight/-seat/-type`, `--z-flight` below the
+topbar for the flight clone, the three-state pin CSS, the reserved four-line
+console, and `ctf:state` — which `ctf.js` dispatches with
 `{ solved[], count, total, bypass, reason, index }`. `hud.js` consumes it and
 applies pin and log state *without animation*, so phase 4 adds choreography to
-plumbing that is already proven end to end.
+plumbing already proven end to end.
 
-**Two fixes found while verifying.**
+**Three fixes found while verifying.**
 
-1. `white-space: pre` was on the run-log container, where it also preserved
-   the indentation between child elements and added phantom line boxes — the
-   block measured 101px against its 84px reservation. Moved to the line.
-2. `.main` had no width under 768px. `.layout` is `align-items: flex-start`,
-   so in column direction children size to max-content on the cross axis; the
-   main column took its widest child's intrinsic width (376px) and overflowed
-   at 320px, quietly clipped by `body { overflow-x: hidden }`. Pre-existing
-   since phase 1.
+0. **`PMREMGenerator` leaked two GPU textures per theme toggle.**
+   `fromEquirectangular()` returns a *render target*; disposing only its
+   `.texture` leaves the target allocated. Ten toggles took
+   `renderer.info.memory.textures` from 3 to 23. Holding the targets and
+   disposing those holds it at 3.
+
+1. `white-space: pre` was on the run-log container, where it also preserved the
+   indentation between child elements and added phantom line boxes — the block
+   measured 101px against its 84px reservation. Moved to the line.
+2. `.main` had no width under 768px. `.layout` is `align-items: flex-start`, so
+   in column direction children size to max-content on the cross axis; the main
+   column took its widest child's intrinsic width (376px) and overflowed at
+   320px, quietly clipped by `body { overflow-x: hidden }`. Pre-existing since
+   phase 1.
 
 **Contrast.** The run console does not use `--text-dim`: it measures 3.43:1 on
 the inset fill in dark and 2.83:1 in light, and both the idle prompt and the
@@ -229,682 +424,58 @@ count column are real text. They use `--text-muted` (5.20:1 / 4.66:1).
 `--text-dim` is still used by `.lock-icon.is-bypassed`, which has the same
 problem and predates this phase — **flagged for phase 6**.
 
-**Verification.** 44 assertions pass in the default pass and 47 under
-`--force-prefers-reduced-motion` (three extra assert the band never moves, the
-shine stays at zero opacity, and the bloom filter is `none`). They cover
-markup hygiene, the hinge origin and transform-box, pin seating and shimming,
-log print order, transient-line removal, the reserved height holding at 84px
-across every state, ten-click bypass spam, the accent rotation, and the idle
-sweep actually moving the band. No-JS was rendered with every script stripped
-and `noscript.css` linked directly: content revealed, lock open, accent green,
-pin rail and status strip hidden. Zero horizontal overflow at 320px and 390px.
+**On `animation-timeline: view()`.** Evaluated as the brief asked, not used.
+GSAP is loaded for phase 4 regardless, so the native path buys nothing.
 
-**Payload.** GSAP core + ScrollTrigger cost 116.6KB raw / 45.3KB gzipped,
-loaded as two individual files rather than the bundle. Total first load is
-~240KB raw against the 400KB budget. Flip, if phase 4 needs it, still fits.
+**Payload — measured.** First-load **transfer** is **314KB**: Three 149.9KB gz,
+GSAP core 28.3KB gz, ScrollTrigger 17.9KB gz, the portrait 76.6KB, and 40.9KB gz
+for all of the HTML, CSS and JS together. Web fonts are not in that figure.
+Uncompressed the same set is 924KB, and Three is 603KB of it.
 
-## Phase 3R — the hero lock becomes a real object
-
-`LOCK_SPEC.md` and this file are **both authoritative** — the spec owns what the
-lock *is* (technology, form, geometry, materials, lighting, choreography), this
-file owns how it gets *built and integrated* (phase order, triggers, site state,
-budgets, fallback sequencing). On a genuine same-question conflict this file
-wins, as the later document; every divergence is listed in the spec's authority
-table and argued here. The spec has changed the technology, not just the
-artwork. **The hero lock is now a Three.js WebGL scene.** The previous draft of
-this phase — a hand-authored SVG padlock lit by CSS gradients — is not
-discarded, but it is demoted: it becomes the fallback path and the source of
-the per-section badges.
-
-Three prototypes in the repo root. `lock-combined-prototype.html` is the one
-that matters — it is the verified render with the geometry, environment map and
-tumbler-parenting fixes already applied. **Where it and the spec text disagree,
-the combined prototype wins** (see §3, the camera trap).
-
-### Decisions locked by the spec — do not re-litigate
-
-| Decision | Status |
-|---|---|
-| Hero lock is a Three.js WebGL scene | locked |
-| 3D unlock, including the sideways `rotation.y` shackle swing | locked, approved |
-| Light animation is a scroll-driven shine sweep, independent of the unlock | locked |
-| Body is dark gunmetal, shackle is polished chrome | **overridden** — both are chrome, see 3R notes |
-| Lock renders at 1.5x the hero name type size | locked |
-| Lock opens once, when all three puzzles are complete | locked (§5, our deviation) |
+**The 600KB line holds against transfer and is blown by raw bytes**, so it is
+recorded here as 600KB *transferred* — the number the constraint was always
+about — leaving ~286KB of headroom. Deleting the SVG lock returned 0.8KB gz,
+which is honestly nothing; it was worth doing for the second implementation it
+removed, not for the bytes.
 
 ---
 
-### 0. Budget — DECIDED: raise it
+### 6. Verification
 
-`three.min.js` r128 is ~600KB raw, ~150KB gzipped. The brief's §8 budget of
-**400KB total first load** cannot hold it. **The budget is raised deliberately
-rather than worked around.**
+**That the SVG is gone (4a):**
 
-The deferred-load dance (ship SVG, fetch Three on idle, swap it in later) is
-dropped. Three loads with a normal `defer`d CDN tag alongside GSAP.
+- Grep the codebase for `lock-svg--hero`, `data-lock-render`, `--shackle-rotate`,
+  `lock-ramp`, `lock-spec`, `lock-silhouette`. Only the sprite's three geometry
+  ids should survive.
+- **All three section badges still render** — the `<use>`/`<defs>` check, and the
+  one thing most likely to break silently.
+- Disable WebGL, and separately block the Three CDN: no console errors, no empty
+  hole — the lockup closes to `MARTIN DANG`. Contacts, identity and content all
+  still reachable.
+- JS off entirely: same, plus content revealed and puzzle machinery hidden.
 
-**This costs nothing in money.** GitHub Pages is free regardless of page weight,
-and the CDN serves Three, so it never touches the repo's bandwidth. The cost is
-load *time* on slow connections, and that is the trade being accepted.
+**Centring (4b):**
 
-**Set the new budget at 600KB** and **measure the real number during 3R-b and
-report it** — the 400KB figure was a real constraint that shaped phases 1-3
-(the portrait went 704KB -> 74KB because of it), so replacing it with a
-guess would waste that work. Measure, write it down, and hold the new line.
+- A 1px ruler down the viewport centre bisects the lock's **body** and the middle
+  pin. Before the change it bisects neither.
+- 375 / 768 / 1440, plus 320 for word collision.
+- After a solve the shackle swings in depth and the silhouette shifts — the body
+  is the reference, not the silhouette.
 
-**What this does *not* change: the SVG lock still ships first.** Spec §6 still
-requires it, because WebGL can be unavailable for reasons that have nothing to
-do with download speed — old hardware, GPU blocklists, blocked contexts,
-privacy configs. The SVG is in the HTML, Three initialises after it, and the
-canvas swaps in. Raising the budget makes that swap fast and near-invisible; it
-does not remove it.
+**Unchanged behaviour, re-checked after both edits:**
 
----
-
-### 1. Architecture — the fallback is the base layer, not a branch
-
-This is the single most important structural idea in the phase, and getting it
-backwards produces the failure mode §6 warns about (a hole in the page on slow
-connections).
-
-**The SVG lock is not a degraded alternative that renders when WebGL fails. It
-is what the page ships, always. WebGL is an upgrade painted over it.**
-
-That gives a clean split into two sub-phases, each independently deployable:
-
-| | Ships | Ends at |
-|---|---|---|
-| **3R-a** | the SVG lock: new geometry, metal tokens, `--p` scroll lighting, section badges | a complete working hero with a scroll-lit lock. Deployable on its own. |
-| **3R-b** | the Three.js scene, deferred load, cross-fade swap, theme sync, state API | the headline feature, layered on top |
-
-If 3R-b is never built, or fails at runtime, or the CDN is blocked, or the GPU
-is blocklisted — the page is still correct. Nothing needs a `try` around it at
-the feature level, because there is no state in which the hero is empty.
+- Metal reads as chrome in both themes; ten theme toggles leak no textures
+  (`renderer.info.memory.textures`).
+- Unlock plays once on the third solve, three beats as one motion, open shackle
+  legible; relock faster and harder.
+- Full scroll sweep across the hero's exit, reversing on the way up; the page
+  never stops scrolling.
+- Reduced motion: lights neutral at `p = 0.5`, no idle, no float, lock holds its
+  *current* state rather than forcing open.
+- No layout shift when the canvas arrives — the box is reserved.
+- Screen reader: the lock is announced once, with correct state.
 
 ---
-
-### 2. Phase 3R-a — the SVG lock
-
-Most of this was already planned; it survives with its ambition scaled to its
-new job. The fallback's target is "reads as metal, relights with scroll, nobody
-thinks it is broken" — not "matches the WebGL render".
-
-**Geometry.** `viewBox` `0 0 64 92` -> **`0 0 180 264`**. Every number in the
-current SVG, `components.css` and `lock.js` is dead.
-
-```
-body      rect  x=10 y=136 w=160 h=118 rx=10
-bevel     rect  x=16 y=142 w=148 h=106 rx=7      stroke only, no fill
-shackle   path  M 34.5 150 V 79.5 A 55.5 55.5 0 0 1 145.5 79.5 V 150
-                stroke-width=22  stroke-linecap=butt  fill=none
-keyhole   circle cx=90 cy=175.6 r=15.5  + tapered slot 11 -> 26 wide, to y=221.8
-```
-
-Load-bearing details: `stroke-linecap="butt"` not `round` (machined ends, and
-the legs run 14 units into the body so the cuts never show); the bevel rect is
-what makes the body read as chamfered metal rather than a rounded rectangle;
-the keyhole cuts through to `--bg`.
-
-**Lighting — a reduced `--p` model, deliberately.** The prototype's four-layer
-stack (specular + warm wash + shade + sign-flipping edges) was specced when the
-SVG *was* the hero lock. It is now a fallback, so build three layers, not four:
-
-1. the base body ramp — a static `<linearGradient>` with the §6 abrupt stops,
-   `0% hi · 6% mid · 18% lo · 55% lo · 68% mid · 88% hi · 100% mid`. **The jumps
-   are the chrome**; anyone smoothing them has made grey plastic.
-2. one specular `<radialGradient>`, `fx = 0.1 + p * 0.8`, set in JS —
-   gradient attributes cannot read `var()`.
-3. the sign-flipping edge highlights, which are the cheapest and most
-   convincing part of the whole model:
-   ```css
-   .body-edge-l { opacity: clamp(0, calc((0.5 - var(--p)) * 2), 1); }
-   .body-edge-r { opacity: clamp(0, calc((var(--p) - 0.5) * 2), 1); }
-   ```
-   The lit edge *becoming* the shadowed edge as light crosses is what reads as
-   a lit object rather than a texture.
-
-Dropped from the earlier draft: the warm diffuse wash and the animated cast
-shadow. They are the two layers with the worst effort-to-visibility ratio on a
-path most visitors never see.
-
-**`--p` is registered** (`@property --p { syntax: '<number>'; inherits: true }`)
-and driven by the same ScrollTrigger described in §4 — the SVG path writes
-`--p`, the WebGL path moves lights, from one shared scalar.
-
-**Metal tokens** in `tokens.css`, both themes, so the SVG re-themes with no JS:
-
-| Token | Dark | Light | Note |
-|---|---|---|---|
-| `--metal-hi` | `#f4f7f5` | `#e9e5dc` | soft off-white on paper |
-| `--metal-mid` | `#7d8a84` | `#58605b` | light ~30% down from dark |
-| `--metal-lo` | `#0d1512` | `#3a3f3c` | warm dark grey on paper, **never black** |
-
-Light-theme risk: `--metal-hi` sits close to `--light-bg`, so the silhouette
-dissolves wherever the ramp peaks. Mitigation: a hairline outer contour at
-`--metal-lo`, opacity ~0.5, **light theme only** — in dark it would read as an
-outline on an object that should be defined by its own values.
-
-**Section badges (spec §7).** Same paths, different dress. One SVG asset, two
-classes: `.lock-svg--hero` gets the gradients and `--p`; `.lock-svg--badge` is
-flat single-colour, keeps the existing accent/amber/`--text-dim` states, and
-opens with a plain CSS `rotate` on the shackle group. It should read as the
-hero lock's schematic sibling, not a shrunken copy. **One canvas in the hero is
-the budget; four is not.**
-
-**Unlock degrade.** On the SVG path the unlock is a CSS transition on the
-shackle group — `rotate(-38deg)` about `145.5 150`, the hinge pin at the base
-of the right leg. No pop, no tumbler turn. It reads as "the lock opened", which
-is all the fallback owes anyone.
-
-**Sizing** — shared with 3R-b, see §3.
-
----
-
-### 3. Phase 3R-b — the WebGL scene
-
-Port `lock-combined-prototype.html` into `js/lock3d.js`. **Port, do not paste** —
-it is reference, not a drop-in, and it must live in the module structure.
-
-**Loading.** A normal `defer`red CDN `<script>` with `integrity` and
-`crossOrigin`, alongside GSAP — no dynamic injection, no idle callback (see §0).
-r128 is a classic global build, so it lands on `window.THREE`; `lock.js` reads
-it rather than importing it. On success, init the scene, cross-fade the canvas
-in over ~200ms, and remove the SVG from the accessibility tree. On any failure —
-no WebGL, script error, CDN blocked — do nothing at all; the SVG is already
-correct and already on screen.
-
-```js
-function hasWebGL() {
-  try { return !!document.createElement('canvas').getContext('webgl'); }
-  catch (e) { return false; }
-}
-```
-
-**The environment map is required, and it is the whole material.**
-`MeshStandardMaterial` at `metalness: 1` has nothing to reflect without one, so
-metal renders flat and dark *no matter how many lights are added*. This is the
-gap between the standalone prototype and the reference image, and it cannot be
-closed by raising light intensity.
-
-The combined prototype builds one procedurally — 512x256 canvas, vertical
-gradient sky, **vertical bright bars with hard near-black gaps**, through
-`PMREMGenerator.fromEquirectangular()`. The bars are the mechanism: a flat metal
-face reflects them as the hard vertical banding that reads as polished chrome.
-Without the bars it is a smooth gradient, which reads as plastic. Lights then
-only carry shadow and rim definition — `key` ~1.5, `hemi` ~0.25.
-
-**Materials — two finishes, and the contrast is the design:**
-
-```js
-steel = { color: 0xdfe5ee, metalness: 1.00, roughness: 0.10 }   // shackle — mirror
-shell = { color: 0x171b21, metalness: 0.94, roughness: 0.19 }   // body — dark gunmetal
-```
-
-Do not raise the body toward mirror chrome. Its darkness comes from the
-near-black base colour, not from low metalness — it still needs high metalness
-to catch the environment's banding or it flattens into plastic.
-
-**Geometry derives from the reference ratios**, as the combined prototype does:
-`BW`, `BH = BW*0.74`, `ARC`, `TUBE`. Retuning means changing constants in one
-place rather than scaling the group. The body is `ExtrudeGeometry` with
-`bevelThickness 0.07 / bevelSize 0.07 / bevelSegments 4` — that bevel is the
-bright chamfer line from the reference and is non-optional.
-
-**Camera — DECIDED: use `lock-combined-prototype.html`'s values,
-`fov 35, position (0, 0.30, 5.3)`, looking at `(0, 0.30, 0)`.**
-
-The spec's §1 text says `(0, 0.35, 4.6)` and disagrees. Two reasons the
-prototype wins: it is the most recent working implementation, and spec §0 names
-it the verified render. Critically, **the 0.77 fill constant in the sizing
-formula was measured against the prototype's camera** — taking the camera from
-one source and the constant from the other yields a lock of the wrong size and
-a long confusing afternoon. If the camera is ever retuned, re-measure 0.77 in
-the same sitting.
-
-**Sizing.** The canvas is square and the lock fills only ~77% of it, so sizing
-the canvas to 1.5x yields a lock that looks about 1.15x. Correct for it:
-
-```css
-.hero-band  { --hero-size: clamp(var(--display-md), 9vw, 92px); }
-.lockup     { font-size: var(--hero-size); }
-#lock-stage { width: calc(1.5 * var(--hero-size) / 0.77); aspect-ratio: 1; flex: none; }
-```
-
-Keep the existing clamp values — they are tuned for this site — but move them
-into `--hero-size` so both numbers derive from one token and the ratio holds at
-every breakpoint. Both the canvas and the SVG fallback use this box, so the swap
-does not resize anything.
-
-**Centre the body, not the box.** The shackle makes the object top-heavy and
-box-centring makes it float above the type. Nudge with a CSS `translateY` on the
-stage rather than moving the camera target — moving the target changes the 0.77
-constant. Verify optically; the spec is explicit that 1.5 and this offset are a
-starting point and your eye is the tiebreaker.
-
-**Two things this breaks**, both fixed in the same commit:
-
-1. `.hero-band` has `overflow: hidden` and will clip the lock once the stage
-   translates up. Confirm what that rule was guarding (probably the grain layer)
-   and scope it there instead.
-2. Headroom: `padding-block-start: calc(0.25 * var(--lock-h) + var(--space-8))`,
-   derived from the same token so it tracks at every breakpoint.
-
-**Render loop and battery.** The `requestAnimationFrame` loop otherwise runs
-forever for a 0.02-unit float. Gate it on an `IntersectionObserver` over the
-stage *and* on `document.hidden`. The idle float stays; there is no idle
-rotation — the lock never spins.
-
-**Mobile.** Shadow map down to 512 and `pixelRatio` capped at 1.5 below 768px.
-`PCFSoftShadowMap` at 1024² with `pixelRatio` 2 is real GPU work on a phone.
-Measure on an actual device, not a simulator.
-
-**Version pin.** r128 with SRI. If anyone bumps it: `renderer.outputEncoding`
-and `THREE.sRGBEncoding` were **removed in r152+** (now `outputColorSpace` /
-`SRGBColorSpace`) and the scene renders washed out. Two lines, but silent.
-
----
-
-### 4. The scroll shine — one scalar, two implementations
-
-**What it is:** a shine that travels across the lock as the visitor scrolls.
-Scroll position is the only input. It runs continuously, locked or unlocked,
-and is **entirely independent of the unlock**.
-
-**What it is not:** a lighting effect that fires when the lock opens. The unlock
-timeline drives no lights at all.
-
-One `p` runs 0 -> 1 as the hero crosses the viewport. `0` = light hard left,
-`1` = hard right. Both paths consume the same scalar:
-
-| Path | `onUpdate` writes |
-|---|---|
-| WebGL | `key.position.x = -6 + p * 12`, `rim.position.x = 6 - p * 12` |
-| SVG | `--p` on the rig, plus the specular gradient's `fx` |
-
-In 3D the travelling specular, the shifting shade, the flipping lit edge and the
-swinging cast shadow all follow **for free** from the renderer moving a real
-light. That is the payoff for doing it in 3D instead of faking gradients — and
-it is why the environment map matters so much, because the shine *is* the
-environment's bright bars sweeping across the metal.
-
-```js
-scrollTrigger: { trigger: '#hero', start: 'top bottom', end: 'bottom top', scrub: 0.5 }
-```
-
-**No pin. No sticky.** Stated three times in the spec and once more here,
-because `.hero-band` is at the top of the page and pinning it is the obvious
-wrong move. The page scrolls at normal speed throughout.
-
-**Idle oscillates around the scrub's resting value, not around 0.5.** The hero
-sits at the top of the page, so on load the trigger is already partway through
-its range and `p` rests near the middle. An idle loop swinging around a
-hardcoded 0.5 will visibly jump the moment the scrub takes over. Read the
-resting `p` and oscillate `+/-0.175` around *that*, one pass per ~5s, cancelled
-on first scroll input.
-
-**Strict separation from the unlock:**
-
-| System | Writes to | Triggered by |
-|---|---|---|
-| Shine sweep | `key.position.x`, `rim.position.x` (or `--p`) | scroll, continuously |
-| Unlock | mesh transforms only | a solved state, once |
-
-Never the same property. Expect one consequence and do not "fix" it: if the
-state flips mid-scroll, the shackle relights as it swings, because the renderer
-is lighting a moving object. That is correct and desirable — do not freeze the
-lights during the unlock.
-
----
-
-### 5. The unlock animation
-
-From `lock-unlock-prototype.html`, confirmed by the user, ~1.6s. **Implement
-this; do not substitute a simpler reveal.** Absolute start times are part of the
-design — each beat begins before the last ends, so it reads as one continuous
-mechanism rather than four queued steps.
-
-| # | Beat | Target | Value | Start | Duration | Ease |
-|---|---|---|---|---|---|---|
-| 2 | body recoils | `body.position.y` | `-0.39`, yoyo x1 | 0.36 | 0.07 | `power1.inOut` |
-| 3 | shackle pops | `pivot.position.y` | `0.4` | 0.42 | 0.30 | `back.out(2.4)` |
-| 4 | shackle swings | `pivot.rotation.y` | see below | 0.66 | 0.60 | `power3.out` |
-
-**The pivot trick is the entire reason the lock is 3D.** A `pivot` group sits at
-the right leg (`x = ARC`) with the shackle offset back (`x = -ARC`) inside it.
-Rotating `pivot.rotation.y` swings the shackle out *sideways in depth*. Do not
-rewrite it as a Z-rotation; that is the SVG fallback's version, and it is the
-version that looks like a cartoon.
-
-**Beat 4 needs a call.** The prototype's `-1.9` rad (~109°) puts the shackle
-nearly perpendicular to camera, where it reads edge-on as a thin rod rather than
-an open shackle — confirmed in render. **Use `-1.2` rad (~69°)** as the starting
-value, in the spec's suggested 63-75° band: unmistakable 3D depth while the open
-shackle stays legible. Check both in the browser and pick.
-
-**The tumbler bug is already fixed in the combined prototype — keep it fixed.**
-In the standalone version `tumbler` is a sibling of `body`, so beat 2 moves the
-body and the keyhole detaches during the recoil. The tumbler must be parented to
-the body.
-
-**Beat 5 is CUT.** `LOCK_SPEC.md` §3 has a fifth beat that flashes the body
-green (`shell.emissive`, green -> 0). **Remove it.** The lock does not flash
-red or green — it is a neutral metal object and it signals state by *opening*,
-which is the stronger signal and is consistent with it having been pulled out of
-the accent system entirely.
-
-This is the second deliberate deviation from the spec, alongside the trigger
-below. It also deletes spec §9's "emissive green comes from theme tokens"
-constraint and the `Color.setStyle()` parsing problem that came with it — Three
-r128 cannot parse our space-separated `hsl(h s l)` tokens, and with no emissive
-there is nothing to parse. **Note both deviations in the commit message.**
-
-The site still turns green on solve: `DANG`, the pins, the badges, the borders
-and glows all rotate. The lock stays chrome throughout.
-
-**Trigger — DECIDED. The lock opens exactly once, when all three puzzles are
-complete.** It fires on `data-solved` flipping `false -> true`: the third solve,
-or bypass-on. Nothing else opens it.
-
-This is the one deliberate deviation on a trigger question, and it is recorded
-in the spec's authority table. Its §3 says the unlock fires "when a CTF challenge is solved",
-singular. We are not doing that: firing a 1.6s four-beat mechanism three times
-spends the payoff twice before it means anything, and a lock that opens on
-challenge one has nothing left to say on challenge three. **Note the deviation
-in the commit message** so nobody reads §3 later and "fixes" it back.
-
-**The pin rail stays exactly as built**, and is now the only thing carrying
-per-solve feedback:
-
-| Event | Hero lock | Pin rail | Run console |
-|---|---|---|---|
-| solve 1 | nothing | pin 0 seats | `[+] skills.txt decrypted 1/3` |
-| solve 2 | nothing | pin 1 seats | `[+] projects.db restored 2/3` |
-| solve 3 | **plays, all four beats** | pin 2 seats | `[+] flag.png carved 3/3` |
-| bypass on | **plays, all four beats** | unsolved pins go `shim` | `[!] bypass enabled` |
-| bypass off | **relocks** | shims clear, seated pins stay | transient line removed |
-
-Three pins seating one by one is the build-up; the lock opening is the payoff.
-The lock stays visibly shut through the first two solves, which is what makes
-the third land. On the third solve the pin-seat beat chains straight into beat 1
-— no gap. Under bypass the staggered run reaches the lock at ~300ms.
-
-**Relock:** reverse at 0.7x with `power2.in`. Mechanisms close faster and harder
-than they open. Only bypass-off ever triggers it; a real solve is never undone.
-
----
-
-### 6. State model
-
-Three states, and the site must be able to enter **any** of them without playing
-an animation:
-
-| State | When | Visual |
-|---|---|---|
-| `locked` | default | shackle seated, tumbler upright |
-| `unlocked` | after solve, after bypass | shackle up and swung open, tumbler turned |
-| `unlocking` | the transition | the §5 timeline plays once |
-
-The API is `setState(state, { animate })`. `animate: false` is `tl.progress(0)`
-or `tl.progress(1)` with no playback. **Only a live solve animates.**
-
-**One discrepancy to flag rather than silently resolve.** The spec's §5 lists
-"on page load with saved progress" as a route into `unlocked`. This site does
-not persist solve state — that is deliberate, and PLAN's phase 4 verification
-asserts it ("reload comes back locked"). So that branch is currently
-unreachable. Build the API anyway; it costs nothing and phase 5 may add
-persistence. **Do not add persistence as a side effect of implementing the
-state model.**
-
----
-
-### 7. Theme sync
-
-`theme.js` currently owns the theme and nothing listens. Add the counterpart to
-`ctf:state`: a `theme:change` CustomEvent on `document` carrying the resolved
-theme. `lock.js` subscribes.
-
-**`scene.environment` must be rebuilt on toggle, not just the lights** — it
-carries most of the material's appearance, and a dark studio env on the paper
-theme is most of what would make the lock look like a hole punched in the page.
-Dispose the old one; `PMREMGenerator` output is a GPU texture and leaks
-otherwise.
-
-Values from the combined prototype:
-
-| | Dark | Light |
-|---|---|---|
-| `hemi.groundColor` | `0x0a0b0e` | `0xd8d3c4` |
-| `hemi.intensity` | 0.25 | 0.55 |
-| `rim.color` | `0x9fc4ff` | `0xffe9c4` |
-| `shell.color` | `0x171b21` | `0x424953` |
-| `steel.color` | `0xdfe5ee` | `0xf0f3f7` |
-| `floorMat.opacity` | 0.42 | 0.20 |
-| env floor / bars | dark, cool | brighter floor, warmer bars |
-
-**The gunmetal body stays dark in light theme.** It lightens only enough to
-separate from the paper ground (`0x424953`) — it never becomes a mirror. The
-shackle/body contrast is the design in both themes.
-
-These belong in `tokens.css` as lock tokens read by `lock3d.js`, not as hex
-literals in JS. No hardcoded colour in the lock module. Note that with beat 5
-cut there is no accent colour anywhere in the lock — these are all neutral
-metal and lighting values.
-
----
-
-### 8. Reduced motion and accessibility
-
-**Reduced motion.** The prototype's `tl.progress(1)` is right for a demo and
-wrong for the site — it would show every lock already open. Correct behaviour is
-**snap to the current state without tweening**: `progress(0)` when locked,
-`progress(1)` when unlocked, kill the ScrollTriggers, and park the lights
-neutral (`p = 0.5`, `key.position.x = rim.position.x = 0`). The idle float goes
-too.
-
-**Accessibility.** A `<canvas>` is invisible to assistive tech. `role="img"`
-plus an `aria-label` that tracks state ("Padlock, locked" / "Padlock,
-unlocked"), updated on the same event that plays the timeline. **The real
-announcement goes in an `aria-live` region on the section, not on the canvas** —
-and we already have two (`.challenge-msg`, the progress `role="status"`), so the
-lock adds none. When the canvas swaps in, the SVG must leave the accessibility
-tree so the lock is not announced twice.
-
----
-
-### 9. Risks
-
-| Risk | Mitigation |
-|---|---|
-| Page weight | Budget raised to 600KB deliberately (§0); measure the real figure during 3R-b and report it |
-| Metal renders flat and dark | The env map, with vertical bars. Not fixable with light intensity |
-| Someone bumps Three past r152 | Pin r128 + SRI; `outputEncoding`/`sRGBEncoding` removed, renders washed out |
-| Spec camera vs prototype camera | Use the prototype's `(0, 0.30, 5.3)`; the 0.77 constant was measured against it |
-| Shackle reads as a thin rod when open | Beat 4 at `-1.2` rad, not `-1.9`; verify in browser |
-| Phone GPU / battery | Shadow map 512, `pixelRatio` 1.5 below 768px, rAF gated on IntersectionObserver + `document.hidden` |
-| Lock looks like a hole on paper theme | Rebuild `scene.environment` on toggle, not just lights; body lightens to `0x424953` |
-| Visible pop when the canvas replaces the SVG | Shared sizing box, shared silhouette, ~200ms cross-fade. Fast now that Three is not deferred, but still present |
-| PMREM texture leak on repeated theme toggles | Dispose the previous environment before assigning |
-| `.hero-band { overflow: hidden }` clips the lock | Scope that rule to whatever it was actually guarding |
-
----
-
-### 10. Files
-
-| File | Change |
-|---|---|
-| `index.html` | hero lock SVG replaced (new geometry); `#lock-stage` wrapper wrapping both SVG and canvas; section badges swapped to the new SVG; `<title>`/`aria-label` state-tracking |
-| `css/tokens.css` | `@property --p`; metal tokens both themes; lock 3D colour tokens; `--shine-intensity` / `--lock-bloom` removed |
-| `css/components.css` | `.hero-lock` rules replaced; `--hero-size` + `#lock-stage` sizing; `.lock-svg--hero` / `--badge` dress; `.hero-band` overflow + padding |
-| `css/motion.css` | `lock-shine-sweep` / `lock-shine-fade` / `[data-shine-band]` deleted; reduced-motion block rewritten |
-| `js/lock.js` | rewritten as orchestrator — capability check, deferred Three load, path selection, `setState()`, SVG `--p` controller |
-| `js/lock3d.js` | **new** — the Three.js scene, ported from the combined prototype |
-| `js/theme.js` | dispatch `theme:change` |
-| `js/animations.js` | phase 4; consumes the lock's `setState()` rather than owning the timeline |
-
-Unchanged: `ctf.js`, `hud.js` state plumbing, the pin rail, the run console,
-everything in phases 1 and 2.
-
----
-
-### 11. Verification
-
-**3R-a, on its own, with WebGL disabled:**
-
-- Silhouette holds in both themes at `--p` = 0, 0.5, 1 (set by hand in devtools).
-- Edge highlights actually swap sides crossing 0.5. If not, the `clamp()` signs
-  are backwards and the model is inert.
-- The body ramp still bands — screenshot it and confirm hard value jumps.
-- Section badges read as schematic siblings, and still show locked / unlocked /
-  bypassed states correctly.
-
-**3R-b:**
-
-- Metal reads as chrome, not grey plastic — the env map is the test.
-- Shackle mirror vs body gunmetal contrast is visible in both themes.
-- Optical size check at 375 / 768 / 1440: dominant but not comic, **body**
-  centred on the type at all three.
-- Nothing clips at the top of the hero band.
-- Unlock plays once, all four beats overlapping into one motion; the open
-  shackle reads as open, not as a rod. No colour flash at any point.
-- Relock reverses faster and harder than the open.
-- Solve mid-scroll: shackle relights as it swings, nothing stutters, no fight
-  between scrub and timeline.
-- Theme toggle mid-scene: env rebuilds, no leak across ten toggles (watch
-  `renderer.info.memory.textures`).
-- Scroll fast through the hero: **the page never stops scrolling.**
-- Off-screen and backgrounded: rAF loop actually stops (breakpoint or a counter).
-- Phone, real device: frame rate and battery, not a simulator.
-
-**Both paths:**
-
-- Reduced motion: lights neutral, no scrub, no float, lock at its *current*
-  state — locked stays locked.
-- Block the Three CDN: SVG stays, no console errors, no empty box.
-- Throttle to slow 3G: SVG is visible from first paint; the canvas swap, when it
-  lands, does not shift layout. This is the case option B makes worse — look at
-  it honestly before shipping.
-- Screen reader: the lock is announced once, with correct state, and the swap
-  does not produce two.
-- Budget: measure real first-load transfer, confirm it is under the new 600KB
-  line, and write the number into this plan.
-
----
-
-## Phase 3R notes
-
-Both sub-phases shipped in one commit. The SVG hero lock, the metal tokens, the
-`--p` scroll lighting and the section badges are 3R-a; the Three.js scene, the
-theme sync and the state machine are 3R-b.
-
-**Budget — measured, as §0 required.** First-load *transfer*, which is what a
-visitor actually waits for, is **314KB**: Three 150KB gz, GSAP core 28KB gz,
-ScrollTrigger 18KB gz, the portrait 75KB, and 42KB gz for all of the HTML, CSS
-and JS together. Web fonts are not in that figure. Uncompressed the same set is
-926KB, and Three is 603KB of it. **The 600KB line holds against transfer and is
-blown by raw bytes**, so the line is recorded as 600KB *transferred* — that is
-the number the constraint was always about, and it leaves ~285KB of headroom.
-
-**The two deviations from `LOCK_SPEC.md`, both deliberate:**
-
-1. **The lock opens once, when all three puzzles are complete** — the third
-   solve or bypass-on, on `data-solved` flipping. The spec's §3 fires it per
-   challenge. Firing a 1.6s four-beat mechanism three times spends the payoff
-   twice before it means anything.
-2. **Beat 5 is cut.** The spec flashes the body green on unlock. The lock is a
-   neutral metal object and signals state by opening, which is the stronger
-   signal and consistent with it having been pulled out of the accent system.
-   This also deletes the spec §9 constraint that the emissive colour come from
-   a theme token, and with it the fact that Three r128 cannot parse our
-   space-separated `hsl(h s l)` values.
-
-**A third deviation, added after looking at it on screen.** `LOCK_SPEC.md` §1
-locks the body as dark gunmetal and says explicitly not to raise it toward
-mirror chrome. Built that way, the body's flat face came back as one untextured
-tone — it read as plastic beside the SVG lock's hard mirror banding, and the
-SVG's material was the one worth keeping. **Both parts are now polished chrome**,
-separated by tone rather than by finish: the shackle is the brighter of the two.
-
-Getting the banding onto the body needed one non-obvious thing. **The body and
-the shackle carry their own environment maps**, because no single one serves
-both. A flat face at this camera reflects only ~35 degrees of the environment —
-about 50px of a 512px equirect — so the prototype's 26-74px softboxes left the
-body inside a single bar, a mirror with nothing to mirror. The tube is the
-opposite case: its curvature sweeps the whole map in a few screen pixels, so
-bars fine enough to band the body alias into ringing on the shackle. The body
-reflects a 26px repeating ramp built from the SVG lock's own stop sequence; the
-shackle keeps the wide softboxes. The tube also went from 22 radial segments to
-36, since its own faceting showed against the finer pattern.
-
-**Three more changes, made after looking at it on screen.**
-
-- **The keyhole is a hole in the body's own extruded shape**, cutting through to
-  the page exactly as the SVG lock's does, with the extrude bevel wrapping the
-  cut to give the drilled edge its bright rim. The path has to be inflated by
-  `bevelSize` on every side, because the bevel eats that much off a hole: cut at
-  the spec's own numbers the circle closes to a pinhole and the slot pinches
-  shut. This deletes the separate tumbler mesh, and with it **beat 1, the key
-  turn** - there is nothing left to rotate. The remaining three beats keep their
-  spacing exactly, shifted 0.36s earlier so the mechanism starts on the first
-  frame instead of after the gap the key turn used to fill.
-- **The cast shadow is gone**, along with the shadow map and the shadow-catcher
-  plane. That also takes `PCFSoftShadowMap` off the phone GPU budget.
-- **The scroll range is measured from the hero band's top, not the lock's
-  bottom.** `LOCK_SPEC.md` (3) specifies `top bottom` -> `bottom top`, which is
-  right for an element somewhere down the page and wrong for the first thing on
-  it: that range is already ~70% consumed before the visitor scrolls a pixel, so
-  they would only ever see the tail of the sweep. Measured from the band's top
-  the full pass happens over the hero's exit - left to right scrolling down,
-  right to left scrolling back up, which the scrub gives for free.
-
-Also decided in the build: **beat 4 swings to -1.2 rad**, not the prototype's
--1.9, where the shackle reads edge-on as a rod.
-
-**The travelling shine needed a hybrid, and the reason is worth keeping.** The
-two halves of the lock respond to a moving light completely differently. The
-shackle is a tube: its normals sweep a wide range, so moving the key light
-slides a highlight along it exactly as `lock-light-prototype.html` describes.
-The body's front face is flat and faces the camera - every point on it shares a
-normal, so a moving light barely touches it. What that face shows is the
-environment, and an environment map is fixed in world space with no way to
-rotate it in Three r128. So the face gets the prototype's own answer instead: a
-soft specular band, additively blended, travelling across it on a texture
-offset. It is built from the body's own `Shape`, so it is clipped to the
-silhouette *and* to the keyhole for free - the same rule the SVG lock's mask
-enforces, that light never spills past the metal.
-
-**Three bugs found while building, all fixed:**
-
-- **The keyhole was buried inside the body.** `ExtrudeGeometry` adds
-  `bevelThickness` to *each* face, so a centred body's front sits at
-  `BD/2 + BEVEL`, not `BD/2`. The combined prototype has the same line and the
-  same defect; it is subtle enough there to miss.
-- **`stage.dataset.lock3d` serialises to `data-lock3d`,** which never matches a
-  `[data-lock-3d="on"]` selector — the canvas rendered correctly and stayed at
-  `opacity: 0` behind a perfectly good SVG. `setAttribute` instead.
-- **SVG gradient stops cannot take a token from a presentation attribute.**
-  `stop-color="var(--metal-hi)"` does not resolve; presentation attributes are
-  not the cascade. The stops carry classes and the colour comes from CSS.
-
-**Incidental fixes, both pre-existing:** the badge is wider than the bare
-`[ locked ]` text it replaced and pushed the longest section header 13px past a
-320px viewport, so `.section-header` wraps below 768px; and `.lock-icon.is-bypassed`
-used `--text-dim` (3.43:1 dark, 2.83:1 light — both below AA), which is gone with
-the class, the bypassed badge now using the same amber as the run console's
-bypass line.
-
-**Verified.** SVG path with WebGL unavailable: ramp bands hard, edge highlights
-swap sides across `p = 0.5` (measured 0/0.19 either side), silhouette holds in
-both themes. WebGL path under software rendering: canvas swaps in, chrome
-shackle against gunmetal body reads correctly in both themes, keyhole visible.
-Bypass drives the whole chain end to end — lock state, `<title>`, canvas
-`aria-label`, SVG out of the a11y tree, all three badges, pins, run console.
-Reduced motion parks `--p` at 0.5 and leaves the lock shut. No horizontal
-overflow at 320px or 390px.
-
-**Not verified here, and worth a real browser:** GSAP's ticker barely advances
-under headless virtual time, so the unlock timeline only ever reached 0.7%
-progress in automation. The four beats and the relock need a real look.
-
 
 ## Phase 3 -> 4: the unlock system
 
@@ -1050,81 +621,25 @@ not part of the phase 4 scope unless asked for.
 
 ### 4. The hero lock unlock
 
-> **Superseded by phase 3R §7.** The beat table below is the pre-`LOCK_SPEC.md`
-> version and is kept only for the trigger and reduced-motion rules, which still
-> hold. Use the four-beat table in phase 3R for the animation itself.
+Built and specified in **phase 3 §3** — three beats, fired once when
+`data-solved` flips `false -> true` (the third solve, or bypass-on), reversed at
+0.7x on bypass-off. `main.js` already wires it to `ctf:state`, and `reason:
+'init'` never animates.
 
-**Trigger.** `document.documentElement.dataset.solved` flips `false -> true` —
-the third solve, or bypass on. Reversible when bypass goes back off.
-
-| # | Beat | Target | Properties | Timing |
-|---|---|---|---|---|
-| 1 | tumbler catch | lock body `<g>` | `rotate` +/-1.5deg, twice | 120ms, `power1.inOut` |
-| 2 | shackle opens | shackle `<g>` | `rotate: -32 -> settle -28`, `y: -3` | 380ms, `back.out(1.4)` |
-| 3 | accent rotates | `:root` | `--accent-h` 0 -> 152 | 500ms, concurrent with 2 |
-| 4 | specular flash | shine mask | one full sweep at 100% + `drop-shadow` bloom peak | 700ms, starts with 2 |
-| 5 | settle | whole lock | body drops 1px, everything rests | 150ms |
-
-`data-solved` keeps its shipped two-state behavior — green under bypass as well
-as under a real solve. The earned-versus-shimmed distinction is carried by the
-pins, in amber, which is additive and does not disturb anything phase 2 verified.
-
-**Reduced motion.** No rotation, no flash. The lock swaps straight to open and
-the accent uses the existing 350ms crossfade.
-
-**Zero layout shift.** The shackle rotates inside the SVG viewBox. The hero
-band's height never changes.
+Phase 4's only job here is sequencing: the third pin's seat chains straight into
+beat 1, with no gap.
 
 ---
 
-### 5. Phase 3 foundation checklist
+### 5. Foundations — all shipped
 
-Not optional. Each is cheap while drawing the lockup and expensive to retrofit.
+Every hook phase 4 needs is already in place and proven: the `ctf:state` event
+with `{ solved[], count, total, bypass, reason, index }`, `hud.js` applying pin
+and log state without animation, the three-state pin CSS, the reserved four-line
+console, `--dur-flight/-seat/-type`, `--z-flight` below the topbar, and
+`@property` on the accent channels so the hue rotates instead of snapping.
 
-**Lock geometry**
-
-1. Shackle in its own `<g>`, body in its own `<g>` — the transform goes on the
-   group, so separate paths alone are not enough.
-2. `transform-box: fill-box` plus an explicit `transform-origin` on the shackle
-   group at the hinge pin (base of the right leg, where it enters the body).
-   Write the coordinate into an SVG comment; phase 4 should not re-derive it.
-3. Reserve ~8 user units of empty viewBox above the shackle's resting arc, or a
-   -32deg rotation plus a 3px lift clips.
-
-**Tokens and properties**
-
-4. Register the accent channels with `@property` in `tokens.css` — `--accent-h`
-   as `<number>`, `inherits: true`. Unregistered custom properties do not
-   interpolate, so without this the hue snaps instead of rotating.
-5. Add the new motion tokens alongside the existing `--dur-*` set:
-   `--dur-flight: 520ms`, `--dur-seat: 180ms`, `--dur-type: 28ms`.
-   GSAP-side eases (`back.out`, `power2.in`) stay in JS — they have no CSS
-   equivalent and do not belong in `tokens.css`.
-
-**State plumbing**
-
-6. `ctf.js` dispatches instead of being read from. At the end of `render()`:
-   `document.dispatchEvent(new CustomEvent('ctf:state', { detail: { solved, total, bypass, reason, index } }))`
-   where `reason` is `'init' | 'solve' | 'bypass-on' | 'bypass-off'` and
-   `index` is the section that changed, or `null`. **`reason: 'init'` must
-   apply state without animating** — this is what stops the whole choreography
-   firing on page load.
-7. `lock.js` exposes an imperative `sweep({ intensity, duration })`, and its
-   idle ambient loop is cancellable and resumable, so the unlock flash does not
-   fight the 5s idle sweep or the scroll scrub.
-
-**Markup shipped empty**
-
-8. The pin rail: three pins in the hero lockup, `[data-pin="0..2"]`, rendered
-   in `empty` state. Phase 3 also ships the CSS for `seated` and `shim` —
-   verifiable by hand-setting `data-pin-state` in devtools — but never sets them.
-9. The run console: the block, its four-line reserved height, the resting
-   `> awaiting input_` line, the blinking cursor, `aria-hidden="true"`. Empty of
-   behavior. Grouped with the existing `.progress` row into one status strip.
-10. `js/hud.js` exists and exports `initHud()`, called from `main.js` after
-    `initCtf()`. In phase 3 it is a no-op stub that only listens for
-    `ctf:state` and applies pin/log state **without animation** — which means
-    phase 3 already proves the event plumbing works end to end.
+Phase 4 adds choreography to plumbing that already works end to end.
 
 ---
 
@@ -1181,15 +696,15 @@ reduced-motion, JS-disabled, screenshot diff):
 
 ## Decisions carried from the brief (do not re-litigate)
 
-- **The 400KB budget is superseded.** Raised to 600KB in phase 3R §0 to admit
-  Three.js, with the real figure to be measured during 3R-b. The brief's §8
+- **The 400KB budget is superseded.** Raised to 600KB to admit Three.js, with
+  the real figure to be measured and recorded in phase 3 §5. The brief's §8
   number is historical.
 
 - Split files, no build step; ES modules; CDN with SRI + `defer`.
 - GSAP-primary + native CSS. No motion.dev, no anime.js — three engines means
   three scroll listeners and ~110KB for effects GSAP already covers.
-- Hand-authored inline SVG padlock — now the fallback path and the section
-  badges only; the hero lock is WebGL (phase 3R, per `LOCK_SPEC.md` §0).
+- Hand-authored inline SVG padlock — **section badges only**. The hero lock is
+  WebGL and has no SVG rendering; see phase 3 §4a.
 - Exactly one inline script permitted: the pre-paint `data-theme` setter (phase 2).
 
 ## Open items

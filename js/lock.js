@@ -3,18 +3,18 @@
 
    Owns three things and delegates the rest:
 
-     1. which rendering is on screen — SVG always, WebGL as an
-        upgrade painted over it;
-     2. the scroll shine, as one normalised scalar shared by both
-        paths;
+     1. whether there is a lock at all — WebGL or nothing;
+     2. the scroll shine, as one normalised scalar;
      3. the lock's state machine, `setState(state, { animate })`.
 
-   The SVG is not a degraded alternative that renders when WebGL
-   fails. It is what the page ships, always, and it is already on
-   screen and already correct before this module runs. Getting that
-   backwards is what puts a hole in the page on slow connections.
-   So there is no `try` at the feature level here: every WebGL
-   branch is an addition, and every failure path is "do nothing".
+   There is no second rendering. If Three never loads, the GPU is
+   blocklisted, or init throws, the stage is marked and collapses,
+   and the lockup closes up to MARTIN DANG. That is a deliberate
+   trade against `LOCK_SPEC.md` §6, which requires an SVG fallback:
+   every piece of content on the page stays reachable in all of
+   those cases, which is the constraint that actually matters, and
+   a half-convincing flat padlock next to the real one was not
+   worth the code it took.
    ============================================================ */
 
 import { createLockScene } from './lock3d.js';
@@ -46,59 +46,33 @@ export function initLock({ prefersReducedMotion = false, gsap = null } = {}) {
      See the trigger below. */
   const hero = stage.closest('.hero-band') || stage;
 
-  const svg = stage.querySelector('[data-lock-svg]');
-  const spec = svg && svg.querySelector('[data-lock-spec]');
-  const title = svg && svg.querySelector('[data-lock-title]');
-
   let state = 'locked';
   let scene = null;
 
-  /* ── THE SHARED SCALAR ──────────────────────────────────────
-     One value, two consumers: the SVG path writes a custom
-     property and the specular gradient's centre; the WebGL path
-     moves a real light. Nothing else writes either. */
+  /* ── THE SCALAR ─────────────────────────────────────────────
+     0 puts the light hard left, 1 hard right. One value, one
+     consumer, one write path: nothing else moves a light. */
   let p = prefersReducedMotion ? NEUTRAL : 0;
 
   function applyLight() {
-    stage.style.setProperty('--p', p.toFixed(4));
-
-    /* Gradient attributes do not resolve var(), so --p reaches the
-       specular through JS. cx and fx move together: moving the
-       focal point alone skews the gradient where we want to
-       translate it. */
-    if (spec) {
-      const x = (0.1 + p * 0.8).toFixed(4);
-      spec.setAttribute('cx', x);
-      spec.setAttribute('fx', x);
-    }
-
     if (scene) scene.setLight(p);
   }
-
-  applyLight();
 
   /* ── STATE ──────────────────────────────────────────────────
      Three states, and the site can enter any of them without
      playing anything. Only a live solve animates. */
+  /* A canvas is invisible to assistive tech, so the state lives on
+     its aria-label. The announcement itself stays on the section —
+     the progress role=status label and the .challenge-msg regions
+     already carry it, and a third would announce one solve three
+     times. With no canvas there is no lock and nothing to
+     announce, which is correct. */
   function paintState(next) {
-    const open = next !== 'locked';
-
-    if (title) {
-      title.textContent = open ? 'Padlock, unlocked' : 'Padlock, locked';
-    }
-    if (scene) {
-      scene.canvas.setAttribute(
-        'aria-label',
-        open ? 'Padlock, unlocked' : 'Padlock, locked',
-      );
-    }
-
-    /* The SVG unlock is a CSS transition on the shackle group. No
-       pop, no tumbler turn — the sideways swing that makes the 3D
-       version worth having cannot be faked here, and "the lock
-       opened" is all the fallback owes anyone. */
-    stage.style.setProperty('--shackle-rotate', open ? '-38deg' : '0deg');
-    stage.style.setProperty('--shackle-lift', open ? '-14' : '0');
+    if (!scene) return;
+    scene.canvas.setAttribute(
+      'aria-label',
+      next === 'locked' ? 'Padlock, locked' : 'Padlock, unlocked',
+    );
   }
 
   function setState(next, { animate = false } = {}) {
@@ -247,27 +221,26 @@ export function initLock({ prefersReducedMotion = false, gsap = null } = {}) {
       scene.setLight(p);
       paintState(state);
 
-      /* Cross-fade only once a frame is actually on the canvas —
-         fading to a blank canvas is the visible pop the shared
-         sizing box exists to avoid. The SVG stays in the DOM (its
-         <defs> are what the section badges draw from) but leaves
-         the accessibility tree, so the lock is announced once. */
-      scene.onReady(() => {
-        /* setAttribute, not dataset.lock3d: the dataset key would
-           serialise to data-lock3d and never match the stylesheet. */
-        stage.setAttribute('data-lock-3d', 'on');
-        if (svg) svg.setAttribute('aria-hidden', 'true');
-      });
+      /* Fade in only once a frame is actually on the canvas —
+         fading up a blank one is the visible pop the reserved box
+         exists to avoid.
+
+         setAttribute, not dataset.lock3d: the dataset key would
+         serialise to data-lock3d and never match the stylesheet. */
+      scene.onReady(() => stage.setAttribute('data-lock-3d', 'on'));
 
       document.addEventListener('theme:change', (event) => {
         scene.applyTheme(event.detail.theme);
       });
     } catch (e) {
-      /* The SVG is already correct and already on screen. */
       if (scene) scene.destroy();
       scene = null;
     }
   }
+
+  /* Nothing is coming. Collapse the stage rather than leaving a
+     reserved square of empty page where a lock should be. */
+  if (!scene) stage.setAttribute('data-lock-3d', 'off');
 
   return {
     setState,

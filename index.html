@@ -47,6 +47,21 @@
 </head>
 <body>
 
+<!-- Shared padlock geometry. These three shapes are the section
+     badges' only drawing, declared once here and re-used by every
+     badge with <use>. They lived in the hero lock's <defs> until
+     the hero became WebGL-only; the hero has no SVG any more, but
+     the badges still do, so the geometry outlived the drawing that
+     introduced it. Coordinates are LOCK_SPEC.md §1 verbatim, in the
+     same 180x264 space the WebGL lock derives its ratios from. -->
+<svg class="lock-sprite" width="0" height="0" aria-hidden="true" focusable="false">
+  <defs>
+    <path id="lock-shackle-path" d="M34.5 150 V79.5 A55.5 55.5 0 0 1 145.5 79.5 V150"/>
+    <rect id="lock-body-path" x="10" y="136" width="160" height="118" rx="10"/>
+    <path id="lock-keyhole-path" d="M84.5 190.09 A15.5 15.5 0 1 1 95.5 190.09 L103 221.8 L77 221.8 Z"/>
+  </defs>
+</svg>
+
 <header class="topbar">
   <div class="logo">&gt; mdang@portfolio</div>
   <div class="topbar-right">
@@ -67,131 +82,23 @@
     <!-- ══════════════════════════════════════════════════════
          THE HERO LOCK
 
-         The stage holds two renderings of the same object. The
-         SVG is what the page *ships* — it is in the HTML, it is
-         correct on its own, and it is never a branch. WebGL is an
-         upgrade painted over it by js/lock3d.js, which appends a
-         canvas into this same box and cross-fades it in. If Three
-         never loads, the GPU is blocklisted, or the CDN is
-         blocked, nothing here changes and nothing is empty.
+         Deliberately empty. js/lock3d.js appends a canvas here and
+         nothing else ever renders inside it: the hero lock is a
+         WebGL scene and has no second rendering. If Three never
+         loads, the GPU is blocklisted, or JS is off, lock.js marks
+         the stage and it collapses — the lockup closes up to
+         MARTIN DANG rather than leaving a hole. Every piece of
+         content on the page stays reachable in all of those cases,
+         which is the constraint that actually matters.
 
-         The box is square because the WebGL camera renders a
-         square frame and the lock fills ~77% of it; both
-         renderings share the box, so the swap resizes nothing.
+         The box is square because the camera renders a square
+         frame that the lock fills only ~77% of, and it is reserved
+         from first paint so the canvas arriving shifts nothing.
 
-         Geometry is verbatim from LOCK_SPEC.md §1 in a 180x264
-         viewBox. Hinge pin: (145.5, 150) — the base of the *right*
-         leg, where a real shackle stays captive. Written here and
-         in .shackle-rig in components.css.
+         No whitespace inside the tag: `.lock-stage:empty` is what
+         holds the reserved box, and a stray newline is content.
          ══════════════════════════════════════════════════════ -->
-    <span class="lock-stage" data-lock-stage>
-    <svg class="lock-svg lock-svg--hero" viewBox="0 0 180 264"
-         role="img" aria-labelledby="lock-title" data-lock-svg>
-      <title id="lock-title" data-lock-title>Padlock, locked</title>
-      <defs>
-        <!-- Shapes declared once. The section badges <use> the same
-             three, so there is one padlock asset on the page in two
-             dresses rather than two drawings to keep in sync. -->
-        <path id="lock-shackle-path" d="M34.5 150 V79.5 A55.5 55.5 0 0 1 145.5 79.5 V150"/>
-        <rect id="lock-body-path" x="10" y="136" width="160" height="118" rx="10"/>
-        <path id="lock-keyhole-path" d="M84.5 190.09 A15.5 15.5 0 1 1 95.5 190.09 L103 221.8 L77 221.8 Z"/>
-
-        <!-- The chrome ramp. userSpaceOnUse so one continuous set
-             of vertical mirror bands runs across the body *and* the
-             shackle instead of restarting inside each element's own
-             bounding box. The stops are abrupt on purpose
-             (LOCK_SPEC §6): the hard value jumps are the chrome,
-             and smoothing them makes grey plastic. -->
-        <linearGradient id="lock-ramp" gradientUnits="userSpaceOnUse"
-                        x1="10" y1="0" x2="170" y2="0">
-          <!-- stop-color comes from CSS classes, not presentation
-               attributes: presentation attributes do not resolve
-               var(), and these have to be theme tokens. -->
-          <stop offset="0"    class="stop-hi"/>
-          <stop offset="0.06" class="stop-mid"/>
-          <stop offset="0.18" class="stop-lo"/>
-          <stop offset="0.55" class="stop-lo"/>
-          <stop offset="0.68" class="stop-mid"/>
-          <stop offset="0.88" class="stop-hi"/>
-          <stop offset="1"    class="stop-mid"/>
-        </linearGradient>
-
-        <!-- The one moving layer. Its centre is written by
-             js/lock.js from the same scroll scalar the WebGL path
-             uses to move a real light. cx and fx move together:
-             moving the focal point alone skews the gradient where
-             we want to translate it. -->
-        <radialGradient id="lock-spec" cx="0.5" cy="0.42" r="0.44"
-                        fx="0.5" fy="0.42" data-lock-spec>
-          <stop offset="0"   stop-color="#ffffff" stop-opacity="0.85"/>
-          <stop offset="0.7" stop-color="#ffffff" stop-opacity="0"/>
-        </radialGradient>
-
-        <!-- White where the lock is, black where the keyhole cuts
-             through, so the specular never paints across the hole.
-             The shackle copy carries .shackle-rig too, so the mask
-             tracks the shackle when it opens. -->
-        <mask id="lock-silhouette">
-          <g class="shackle-rig">
-            <use href="#lock-shackle-path" fill="none" stroke="#ffffff"
-                 stroke-width="22" stroke-linecap="butt"/>
-          </g>
-          <use href="#lock-body-path" fill="#ffffff"/>
-          <use href="#lock-keyhole-path" fill="#000000"/>
-        </mask>
-
-        <clipPath id="lock-body-clip">
-          <use href="#lock-body-path"/>
-        </clipPath>
-      </defs>
-
-      <g id="shackle" class="shackle-rig">
-        <use class="shackle-metal" href="#lock-shackle-path"/>
-        <!-- Fixed highlights, inside the group, so they travel with
-             the shackle for free when it opens. -->
-        <path class="shackle-spec"   d="M39.5 148 V79.5 A50.5 50.5 0 0 1 54.29 43.79"/>
-        <path class="shackle-spec-2" d="M140.5 148 V79.5"/>
-      </g>
-
-      <g id="lock-body">
-        <use class="body-metal" href="#lock-body-path"/>
-        <!-- The inset chamfer. Without it the body is a rounded
-             rectangle, whatever the gradient does. -->
-        <rect class="body-bevel" x="16" y="142" width="148" height="106" rx="7"/>
-
-        <!-- The lit edge *becomes* the shadowed edge as the light
-             crosses p = 0.5. Cheapest and most convincing part of
-             the model: if these do not visibly swap sides, the
-             clamp() signs are backwards and the lighting is inert. -->
-        <g clip-path="url(#lock-body-clip)">
-          <rect class="body-edge-l" x="10"  y="136" width="5" height="118"/>
-          <rect class="body-edge-r" x="165" y="136" width="5" height="118"/>
-        </g>
-
-        <g id="keyhole">
-          <use class="keyhole-cut" href="#lock-keyhole-path"/>
-          <path class="keyhole-rim" d="M74.5 175.6 A15.5 15.5 0 0 1 90 160.1"/>
-        </g>
-      </g>
-
-      <!-- Light theme only: --lock-contour is transparent in dark,
-           where an outline would read as a sticker on an object
-           that should be defined by its own values. On paper
-           --metal-hi sits close to the page and the silhouette
-           needs the hairline to survive. -->
-      <g class="lock-contour-group">
-        <g class="shackle-rig">
-          <use class="lock-contour" href="#lock-shackle-path" stroke-width="23"/>
-        </g>
-        <use class="lock-contour" href="#lock-body-path" stroke-width="1.25"/>
-      </g>
-
-      <!-- The travelling specular, masked to the lock so light
-           never spills onto the page. -->
-      <rect class="lock-spec-layer" mask="url(#lock-silhouette)"
-            x="0" y="0" width="180" height="264" fill="url(#lock-spec)"/>
-    </svg>
-    </span>
+    <span class="lock-stage" data-lock-stage></span>
 
     <span class="lockup-word lockup-word--accent">DANG</span>
   </h1>
@@ -282,7 +189,7 @@
         <h2 class="section-title" id="skills-heading">skills</h2>
         <span class="section-divider" aria-hidden="true"></span>
         <span class="lock-badge" data-lock-badge data-lock-state="locked">
-          <svg class="lock-svg lock-svg--badge" viewBox="0 0 180 264" aria-hidden="true">
+          <svg class="lock-svg--badge" viewBox="0 0 180 264" aria-hidden="true">
             <g class="shackle-rig"><use class="badge-shackle" href="#lock-shackle-path"/></g>
             <use class="badge-body" href="#lock-body-path"/>
             <use class="badge-keyhole" href="#lock-keyhole-path"/>
@@ -346,7 +253,7 @@
         <h2 class="section-title" id="projects-heading">projects</h2>
         <span class="section-divider" aria-hidden="true"></span>
         <span class="lock-badge" data-lock-badge data-lock-state="locked">
-          <svg class="lock-svg lock-svg--badge" viewBox="0 0 180 264" aria-hidden="true">
+          <svg class="lock-svg--badge" viewBox="0 0 180 264" aria-hidden="true">
             <g class="shackle-rig"><use class="badge-shackle" href="#lock-shackle-path"/></g>
             <use class="badge-body" href="#lock-body-path"/>
             <use class="badge-keyhole" href="#lock-keyhole-path"/>
@@ -405,7 +312,7 @@
         <h2 class="section-title" id="extra-heading">extra puzzle</h2>
         <span class="section-divider" aria-hidden="true"></span>
         <span class="lock-badge" data-lock-badge data-lock-state="locked">
-          <svg class="lock-svg lock-svg--badge" viewBox="0 0 180 264" aria-hidden="true">
+          <svg class="lock-svg--badge" viewBox="0 0 180 264" aria-hidden="true">
             <g class="shackle-rig"><use class="badge-shackle" href="#lock-shackle-path"/></g>
             <use class="badge-body" href="#lock-body-path"/>
             <use class="badge-keyhole" href="#lock-keyhole-path"/>
