@@ -335,72 +335,17 @@
 /* ══════════════════════════════════════════════════════════════
    THEME ACTIVATION
 
-   Three states, in precedence order:
-     1. an explicit choice          -> [data-theme="light"|"dark"]
-     2. no choice, system is light  -> the media block below
-     3. no choice, system is dark   -> the :root defaults above
+   Two states, in precedence order:
+     1. [data-theme="light"] -> the light block below
+     2. anything else        -> the :root defaults above, i.e. dark
 
-   The inline script in <head> resolves 1 and 2 into an explicit
-   attribute before first paint, so there is no flash. The media
-   block is what keeps state 2 correct when that script never
-   runs — JavaScript disabled, or blocked.
+   `prefers-color-scheme` is deliberately absent. Dark is not this
+   site's "system is dark" branch, it is the site — so the OS never
+   picks, and there is nothing to keep correct when the <head>
+   script is blocked: no attribute is the dark defaults already.
+   Light is reachable only by an explicit choice at the toggle,
+   which the script stamps on <html> before first paint.
    ══════════════════════════════════════════════════════════════ */
-
-@media (prefers-color-scheme: light) {
-  :root:not([data-theme="dark"]) {
-    color-scheme: light;
-
-    --bg:            var(--light-bg);
-    --surface-1:     var(--light-surface-1);
-    --surface-2:     var(--light-surface-2);
-    --surface-3:     var(--light-surface-3);
-    --surface-inset: var(--light-surface-inset);
-    --surface-sunk:  var(--light-surface-sunk);
-    --bg-glass:      var(--light-bg-glass);
-
-    --border:        var(--light-border);
-    --border-strong: var(--light-border-strong);
-
-    --text:          var(--light-text);
-    --text-muted:    var(--light-text-muted);
-    --text-dim:      var(--light-text-dim);
-
-    --locked-h: var(--light-locked-h);
-    --locked-s: var(--light-locked-s);
-    --locked-l: var(--light-locked-l);
-    --solved-h: var(--light-solved-h);
-    --solved-s: var(--light-solved-s);
-    --solved-l: var(--light-solved-l);
-
-    --success:     var(--light-success);
-    --danger:      var(--light-danger);
-    --warn:        var(--light-warn);
-    --amber:       var(--light-amber);
-    --amber-wash:  var(--light-amber-wash);
-    --amber-glow:  var(--light-amber-glow);
-    --danger-wash: var(--light-danger-wash);
-
-    --lock-shell:           var(--light-lock-shell);
-    --lock-steel:           var(--light-lock-steel);
-    --lock-rim:             var(--light-lock-rim);
-    --lock-hemi-ground:     var(--light-lock-hemi-ground);
-    --lock-hemi-intensity:  var(--light-lock-hemi-intensity);
-    --lock-shine-opacity:   var(--light-lock-shine-opacity);
-
-
-    --scanline:      var(--light-scanline);
-    --grain-opacity: var(--light-grain-opacity);
-    --pulse-ring-1:  var(--light-pulse-ring-1);
-    --pulse-ring-2:  var(--light-pulse-ring-2);
-
-    --glow-alpha-lg: var(--light-glow-alpha-lg);
-    --glow-alpha-md: var(--light-glow-alpha-md);
-    --glow-alpha-sm: var(--light-glow-alpha-sm);
-
-    --text-glow:      transparent;
-    --text-glow-soft: transparent;
-  }
-}
 
 :root[data-theme="light"] {
   color-scheme: light;

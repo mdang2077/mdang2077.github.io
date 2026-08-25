@@ -1,33 +1,27 @@
 /* ============================================================
    THEME — dark/light toggle and persistence.
 
-   Three states, in precedence order:
+   Two states, in precedence order:
      1. an explicit choice, kept in localStorage
-     2. no choice -> follow prefers-color-scheme, live
-     3. storage unavailable -> behave as if no choice was made
+     2. anything else -> dark
 
-   The inline script in <head> resolves 1 and 2 into an explicit
+   The OS preference is not an input. Dark is the room this site is
+   authored in, so every visitor lands in it and leaves by choosing
+   to; `prefers-color-scheme` is not consulted here or in the inline
+   <head> script, and nothing re-themes underneath a visitor who has
+   not touched the toggle.
+
+   The inline script in <head> resolves the above into an explicit
    `data-theme` before first paint. This module takes over from
    whatever it decided; it never re-resolves on load, so it cannot
    disagree with what the visitor already sees.
    ============================================================ */
 
 const STORAGE_KEY = 'theme';
-const VALID = ['dark', 'light'];
-
-const systemQuery = window.matchMedia('(prefers-color-scheme: light)');
 
 /* Every storage touch is wrapped: Safari private mode throws on
-   write, and embedded/blocked contexts throw on read. */
-function readStored() {
-  try {
-    const value = localStorage.getItem(STORAGE_KEY);
-    return VALID.includes(value) ? value : null;
-  } catch {
-    return null;
-  }
-}
-
+   write, and embedded/blocked contexts throw on read. Reading is
+   the <head> script's job, so this module only ever writes. */
 function writeStored(value) {
   try {
     localStorage.setItem(STORAGE_KEY, value);
@@ -35,8 +29,6 @@ function writeStored(value) {
     /* Choice applies for this page view only. */
   }
 }
-
-const systemTheme = () => (systemQuery.matches ? 'light' : 'dark');
 
 const activeTheme = () =>
   document.documentElement.dataset.theme === 'light' ? 'light' : 'dark';
@@ -131,16 +123,6 @@ export function initTheme({ prefersReducedMotion = false } = {}) {
   }
 
   paint(activeTheme());
-
-  /* Follow the system only while no explicit choice is stored. */
-  const onSystemChange = () => {
-    if (!readStored()) apply(systemTheme(), { animate: !prefersReducedMotion });
-  };
-  if (systemQuery.addEventListener) {
-    systemQuery.addEventListener('change', onSystemChange);
-  } else if (systemQuery.addListener) {
-    systemQuery.addListener(onSystemChange);
-  }
 
   if (!button) return;
 
