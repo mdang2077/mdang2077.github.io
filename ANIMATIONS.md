@@ -332,13 +332,28 @@ thing the lock touches; nothing else about the field is animated by GSAP.
 
 ### 6. Theme
 
-Glyph colour comes from the "solved/active" green token, per-cell alpha
-`0.22 + random*0.6`. Freshly changed cells draw in a near-white tint instead.
-No hardcoded hex.
+Glyph colour comes from `--field-ink`, which each theme resolves for itself.
+Freshly changed cells draw in a tint of that ink. No hardcoded hex.
 
-**The light theme needs its own values and has not been designed.** Green at low
-alpha on a warm off-white ground will be either invisible or dirty. Treat this as
-open work, not a token swap.
+**Dark:** `--field-ink` is the "solved/active" green, per-cell alpha
+`0.22 + random*0.6`.
+
+**Light — resolved, was open work.** The prediction held: the green went
+grey-olive on the warm ground, the dirty outcome rather than the invisible one.
+It is **ink blue `#2f4260`**, per-cell alpha `0.10 + random*0.22`, chosen off a
+four-hue sweep on the real page (sepia disappeared into the paper, graphite was
+hueless, teal landed back on the grey-olive problem). Ink blue is cool against a
+warm ground so it separates rather than muddies, it reads as printed characters
+rather than as a wash, and it belongs to neither the locked red nor the solved
+green — so the field never looks like it is signalling state. The lower alpha is
+not a dimmer green: dark ink on a light ground at the dark theme's alphas puts
+the field in front of the name.
+
+**The flash target is the page's text colour, not white.** "Near-white tint"
+holds only in the dark; on paper a near-white flash makes the changed glyph
+*vanish* into the ground — the opposite of a flash. The rule is "toward maximum
+contrast with the page", so the tint runs to near-white on dark and near-black
+on paper, and the flash stays a tint of the ink in both.
 
 ### 7. Performance and access
 

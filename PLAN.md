@@ -1597,13 +1597,23 @@ screen before the loop existed, and the mask does what §7.3 says it does.
    glyphs along a straight edge reads as a rendering bug. The first pass held
    0.25 at the edges and the cut was visible in the first screenshot.
 
-3. **Light theme ships provisional, and is still open.** §7.6 says the light
-   theme was never designed and must not be a token swap. It is not one: the
-   alpha floor and range are a separate pair (`0.10 / 0.22` against dark's
-   `0.22 / 0.6`), chosen only so the field is legible enough to judge. On screen
-   it reads as a faint wash rather than as ciphertext. **This still needs a
-   decision** — a different hue, a much higher floor, or no field in light at
-   all.
+3. **Light theme is designed, and it is a different hue.** §7.6's open item is
+   closed; the spec now carries the decision. The first pass shipped the green at
+   a lower alpha pair and it read as a faint grey-olive wash — the "dirty"
+   outcome §7.6 predicted. Four hues were then rendered on the real page at
+   identical alphas and reviewed: **ink blue `#2f4260`** was chosen (sepia
+   `#6b4f35` vanished into the paper, graphite `#3b4450` was hueless, teal
+   `#1f5a5a` landed back on grey-olive). The colour moved behind a new
+   `--field-ink` token — dark resolves it to the solved green, light to
+   `--light-field-ink` — rather than a use-site override, because this is the one
+   effect whose two themes disagree about what it is made of.
+
+   The flash tint moved with it. It read `--text-bright`, a token that **does not
+   exist in this codebase**, so it silently fell back to white: correct in the
+   dark by accident, and on paper it would have made a flashing glyph vanish into
+   the ground rather than flash. It now mixes toward `--text`, which is near-white
+   on dark and near-black on paper — "toward maximum contrast with the page",
+   which is what §7.6's rule means.
 
 4. **Layer order is the band's, not a hero-local stack.** §7.4's three-layer
    diagram assumes a scanline overlay inside the hero. This page's grain and
@@ -1643,6 +1653,10 @@ with the WebGL lock running.
 - **Reduced motion** — hash unchanged over 1s (one frame, no loop), and the field
   still clears to nothing on unlock.
 - **Screen reader** — `aria-hidden="true"` on the canvas; it is not in the tree.
+- **Both themes end to end** — `--field-ink` resolves per theme (`#00ff88` /
+  `#2f4260`), and unlock clears the canvas to zero alpha and relock restores it
+  in each. A first run reported the token as empty; that was Chrome serving a
+  cached `tokens.css`, not the page. Re-run with the cache disabled.
 - **Console** — no errors on any path.
 - **Not verified: frame rate on real phone hardware.** The rAF count in headless
   swiftshader is not a frame rate. The cell budget is ~210 on a phone and the

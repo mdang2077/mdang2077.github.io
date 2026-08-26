@@ -221,6 +221,16 @@
   --light-beam-glow:   rgba(10, 107, 63, 0.28);
   --light-danger-wash: rgba(176, 32, 32, 0.1);
 
+  /* The hero glyph field's ink on paper. NOT the solved green:
+     ANIMATIONS.md §7.6 called that out as undesigned, and at the
+     field's alphas it turns grey-olive on this warm ground — the
+     "dirty" outcome, confirmed on screen before this was chosen.
+     Ink blue is cool against the paper so it separates rather than
+     muddies, it reads as printed characters rather than a wash, and
+     it belongs to neither the locked red nor the solved green, so
+     the field never looks like it is signalling state. */
+  --light-field-ink:   #2f4260;
+
   --light-scanline:      rgba(0, 0, 0, 0.035);
   --light-grain-opacity: 0.028;
   --light-pulse-ring-1:  rgba(0, 0, 0, 0.06);
@@ -264,6 +274,13 @@
   --solved-l: var(--dark-solved-l);
 
   --success:     var(--dark-success);
+
+  /* The hero glyph field's ink (ANIMATIONS.md §7.6). Dark is the
+     solved/active green, exactly as specified. Light is NOT — see
+     the light block. This is the only place the two themes disagree
+     about what a single effect is made of, hence its own token
+     rather than a use-site override. */
+  --field-ink:   var(--dark-success);
   --danger:      var(--dark-danger);
   --warn:        var(--dark-warn);
   --amber:       var(--dark-amber);
@@ -396,6 +413,7 @@
   --solved-l: var(--light-solved-l);
 
   --success:     var(--light-success);
+  --field-ink:   var(--light-field-ink);
   --danger:      var(--light-danger);
   --warn:        var(--light-warn);
   --amber:       var(--light-amber);

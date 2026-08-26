@@ -166,22 +166,33 @@ export function initGlyphField({ prefersReducedMotion = false } = {}) {
 
   function readTheme() {
     const cs = getComputedStyle(document.documentElement);
-    ink = toRgb(cs.getPropertyValue('--success'), '#00ff88');
-    const bright = toRgb(cs.getPropertyValue('--text-bright'), '#ffffff');
-    /* Near-white *tint*, not white: the flash has to look like the
-       same glyph lit, not a different colour of glyph. */
-    flashInk = mix(ink, bright, 0.82);
+    /* `--field-ink` is the field's own colour, and the only reason it
+       exists is that the two themes disagree about what this effect
+       is made of. Dark resolves it to the solved/active green, per
+       §7.6. Light cannot: see the token's note in css/tokens.css. */
+    ink = toRgb(
+      cs.getPropertyValue('--field-ink') || cs.getPropertyValue('--success'),
+      '#00ff88',
+    );
+    /* §7.6 asks for a near-white tint on the freshly changed cell.
+       Read literally that only works in the dark: near-white on
+       paper would make a flashing glyph *vanish* into the ground
+       rather than flash. What the rule means is "toward maximum
+       contrast with the page", so the target is the page's own text
+       colour — near-white on dark, near-black on paper — and the
+       flash is a tint of the ink either way, not a second colour. */
+    const target = toRgb(cs.getPropertyValue('--text'), '#ffffff');
+    flashInk = mix(ink, target, 0.82);
     font = `${FONT_PX}px ${cs.getPropertyValue('--font-mono').trim() || 'monospace'}`;
   }
 
-  /* ── LIGHT THEME — PROVISIONAL ──────────────────────────────
-     `ANIMATIONS.md` §7.6 records that the light theme was never
-     designed for this effect, and warns that the dark green at the
-     dark theme's alphas will be either invisible or dirty on the
-     paper ground. It is not a straight token swap: the alpha floor
-     and range below are separate values, chosen only so the field
-     is legible enough to judge. Treat them as a placeholder for a
-     design decision, not as the decision. */
+  /* ── THE TWO ALPHA RANGES ───────────────────────────────────
+     Not one range with a swapped colour. Dark is §7.6's
+     `0.22 + random*0.6` verbatim; light is lower because its ink
+     (`--light-field-ink`) is dark on a light ground rather than
+     bright on a dark one, and the same numbers there would put the
+     field in front of the name instead of behind it. Both were
+     chosen against the real page, in both themes. */
   const ALPHA = {
     dark: { floor: 0.22, range: 0.6 },
     light: { floor: 0.1, range: 0.22 },
