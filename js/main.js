@@ -6,6 +6,7 @@ import { initCtf } from './ctf.js';
 import { initTheme } from './theme.js';
 import { initHud } from './hud.js';
 import { initLock } from './lock.js';
+import { initGlyphField } from './glyphfield.js';
 import { initAnimations } from './animations.js';
 import { initReveal } from './reveal.js';
 
@@ -30,6 +31,12 @@ if (gsap) document.documentElement.dataset.gsap = 'on';
 
 initTheme({ prefersReducedMotion });
 
+/* Built before the lock, because initLock's first `setState` — the
+   one that settles a bypassed page into its open state without
+   animating — already has to be able to clear it. The field itself
+   is inert until something moves its `master`. */
+const glyphField = initGlyphField({ prefersReducedMotion });
+
 /* ── INIT ORDER ─────────────────────────────────────────────
    Four listeners, and the order they subscribe in is load-bearing:
 
@@ -45,7 +52,7 @@ initTheme({ prefersReducedMotion });
 
    Everything downstream is event-driven, so this is the only place
    the wiring has an order at all. */
-export const lock = initLock({ prefersReducedMotion, gsap });
+export const lock = initLock({ prefersReducedMotion, gsap, field: glyphField });
 
 initAnimations({ lock, prefersReducedMotion });
 initHud({ gsap, prefersReducedMotion });

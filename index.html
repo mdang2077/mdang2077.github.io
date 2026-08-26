@@ -78,6 +78,14 @@
      ══════════════════════════════════════════════════════════════ -->
 <section class="hero-band">
 
+  <!-- Glyph field (ANIMATIONS.md §7). Decoration, and 1440 random
+       characters must never reach a screen reader. It sits below the
+       lockup and the pin rail inside the band's own stacking context;
+       the page's grain and scanline layers are fixed on <body> and
+       render under the whole band, as they already did for the lock.
+       Empty without JS, which is why it needs no noscript handling. -->
+  <canvas class="glyph-field" data-glyph-field aria-hidden="true"></canvas>
+
   <h1 class="lockup">
     <span class="lockup-word">MARTIN</span>
 

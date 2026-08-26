@@ -1,19 +1,22 @@
-# Animations Spec — section unlock
+# Animations Spec — section unlock and hero field
 
 Companion to `CLAUDE_CODE_BRIEF.md` and `LOCK_SPEC.md`. Scheduled as **phase 5** in `PLAN.md`, which carries the build order and the integration notes. This file is authoritative for what happens **when a CTF challenge is solved and a section opens**. The hero padlock is covered separately in `LOCK_SPEC.md`.
 
 ---
 
-## 0. The two chosen effects
+## 0. The chosen effects
 
 | # | Effect | Scope | Library |
 |---|---|---|---|
 | **A** | **Redraw scanline** | the block swap — challenge card → content | GSAP |
 | **B** | **Scramble decrypt** | the text inside the revealed content | GSAP |
+| **C** | **Hero glyph field** | the hero background, behind the lockup | canvas + GSAP |
 
-Both were selected from live prototypes after reviewing 18 alternatives. **Do not substitute a simpler fade** — these are the specified behaviours.
+> **Status note.** Effect B was built for the unlock, reviewed on screen, and **cut** — see `PLAN.md` §5 4c. It survives as the *relock* effect (`PLAN.md` phase 5b), where no beam competes with it. §1–§3 below remain the reference for the scramble mechanics; they are not an instruction to re-add B to the unlock.
 
-**They are not two separate animations.** §3 describes how they compose into one motion. Read that before implementing either.
+All three were selected from live prototypes after reviewing 20+ alternatives. **Do not substitute a simpler fade** — these are the specified behaviours.
+
+**A and B are not two separate animations.** §3 describes how they compose into one motion. C is independent: it lives in the hero and is driven by lock state, not by any section (§7).
 
 ---
 
@@ -231,3 +234,123 @@ One guard, checked once. Kill the timeline, set `textContent` to the final strin
 4. GSAP + ScrollTrigger is already loaded for the hero lock. Adding anime.js and Motion would mean three animation loops, three easing vocabularies, and ~40–50KB more against a budget Three.js has already strained.
 
 anime.js and Motion were evaluated and are not used. This is a decision, not an oversight — do not "modernise" it.
+
+---
+
+## 7. Effect C — hero glyph field
+
+A field of glyphs behind the hero lockup. Present while the site is **locked**,
+clears when the hero lock opens, returns on relock.
+
+Selected from a live prototype against a moving-stream variant. The moving
+version was rejected: motion in a hero background competes with the type, and
+compensating by dimming it costs the effect you wanted in the first place.
+
+### 1. What it is
+
+A fixed grid of monospace characters. **The grid never moves.** A small number
+of cells reroll their character each frame, and the character that just changed
+flashes brighter for ~400ms before settling. It reads as a system under load
+rather than as data flowing past.
+
+### 2. Locked constants
+
+Both were chosen off the prototype's sliders and are **not** defaults to tune.
+
+| Constant | Value | Note |
+|---|---|---|
+| `DENSITY` | `1.00` | every cell in the grid renders — the prototype's maximum |
+| `CHURN` | `0.01` | the prototype's minimum — as close to still as the control goes |
+| `CW` / `CH` | `15px` / `25px` | cell advance, horizontal and vertical |
+| font | `13px` JetBrains Mono | the site's mono stack |
+
+```js
+const rerolls = Math.max(1, Math.round(rows * cols * CHURN * 0.010));
+```
+
+**What those numbers actually produce.** On a ~1400px hero the grid is about
+96 x 15 = **1440 cells**. At `CHURN = 0.01` that expression floors to **one
+reroll per frame** — 60 characters a second, so any given cell changes roughly
+**once every 24 seconds**. That is the intent: a dense, nearly still wall that is
+unmistakably alive if you watch one spot and completely calm if you do not.
+
+**Consequence to accept, not fix.** At full density with near-zero churn the
+field is closer to a *texture* than an animation. If it reads as flat noise on
+screen, the first lever is `CHURN`, not `DENSITY` — density is what makes it feel
+like a wall of ciphertext, and dropping it is what made the prototype look sparse
+and arbitrary. Do not raise churn past ~0.05 without asking; the chosen value
+exists so the hero stays quiet.
+
+### 3. The mask is load-bearing
+
+A horizontal falloff drives the field to **zero opacity across the middle ~40%**
+of the hero, plus a gentler vertical falloff at the top and bottom edges.
+
+```js
+// applied with globalCompositeOperation = 'destination-in', after drawing
+0.00 -> 1.00   0.20 -> 0.55   0.42 -> 0.00
+0.58 -> 0.00   0.80 -> 0.55   1.00 -> 1.00
+```
+
+Without it the name is unreadable **at any opacity** — tested, not assumed. The
+mask is the whole difference between atmospheric and noisy, and it is the reason
+`DENSITY = 1.00` is survivable at all.
+
+### 4. Canvas, not DOM
+
+One `<canvas>`, absolutely positioned, `z-index: 0`. Never a grid of spans: 1440
+nodes repainting every frame beside a live WebGL context is not a tradeoff worth
+having.
+
+Layer order inside the hero, bottom to top:
+
+```
+hero background
+canvas  (the field)          z-index 0
+scanline overlay             z-index 1, pointer-events none
+name / lock / progress dots  z-index 2
+```
+
+Cap `devicePixelRatio` at 2. Rebuild the grid on resize; do not scale it.
+
+### 5. Coupling to the lock
+
+**The lock causes the field to clear.** Not the reverse, and not in parallel —
+fire them on the same frame and they read as two unrelated things.
+
+| t | Beat |
+|---|---|
+| 0ms | hero lock unlock timeline begins (`LOCK_SPEC.md` §3) |
+| 120ms | field starts clearing: `master` 1 -> 0, 850ms, `power2.inOut` |
+
+On relock the field **reseeds before fading back in** — a fresh set of characters,
+not the ones that left. It is a new encryption, not the same one returning.
+`master` 0 -> 1 over 600ms, `power2.out`, starting 100ms into the relock.
+
+`master` is a plain number multiplied into every cell's alpha. It is the only
+thing the lock touches; nothing else about the field is animated by GSAP.
+
+### 6. Theme
+
+Glyph colour comes from the "solved/active" green token, per-cell alpha
+`0.22 + random*0.6`. Freshly changed cells draw in a near-white tint instead.
+No hardcoded hex.
+
+**The light theme needs its own values and has not been designed.** Green at low
+alpha on a warm off-white ground will be either invisible or dirty. Treat this as
+open work, not a token swap.
+
+### 7. Performance and access
+
+- Pause the rAF loop when the hero leaves the viewport (`IntersectionObserver`)
+  and on `visibilitychange`. The hero scrolls away almost immediately; a field
+  animating for a page nobody is looking at is pure battery cost.
+- Below 768px, halve the cell count by raising `CW`/`CH` rather than shrinking
+  the font. A 1440-cell grid on a phone is the wrong budget.
+- Measure with the WebGL lock running. These two are the only continuously
+  animating things on the page and they share a frame.
+- `aria-hidden="true"` on the canvas. It is decoration and must never reach a
+  screen reader as 1440 random characters.
+- **`prefers-reduced-motion`:** render exactly one frame and stop. No rAF loop,
+  no churn, no flashes. The field still appears and still clears with the lock,
+  it simply does not move.

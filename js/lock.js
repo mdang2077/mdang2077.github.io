@@ -38,7 +38,11 @@ function hasWebGL() {
 const activeTheme = () =>
   document.documentElement.dataset.theme === 'light' ? 'light' : 'dark';
 
-export function initLock({ prefersReducedMotion = false, gsap = null } = {}) {
+export function initLock({
+  prefersReducedMotion = false,
+  gsap = null,
+  field = null,
+} = {}) {
   const stage = document.querySelector('[data-lock-stage]');
   if (!stage) return { setState: noop, destroy: noop };
 
@@ -71,11 +75,60 @@ export function initLock({ prefersReducedMotion = false, gsap = null } = {}) {
     );
   }
 
+  /* ── THE GLYPH FIELD ────────────────────────────────────────
+     ANIMATIONS.md §7.5: the lock *causes* the field to clear. Two
+     tweens against one number, and they are the only thing outside
+     js/glyphfield.js that touches the field.
+
+     The 120ms is the whole point of the coupling. On the same frame
+     as the shackle the two read as unrelated things that happened
+     to fire together; a beat behind it, the lock opening is what
+     dismissed the field. */
+  const FIELD_CLEAR_DELAY = 0.12;
+  const FIELD_CLEAR_DUR = 0.85;
+  const FIELD_RETURN_DELAY = 0.1;
+  const FIELD_RETURN_DUR = 0.6;
+
+  let fieldTween = null;
+
+  function moveField(next, animate) {
+    if (!field) return;
+    if (fieldTween) fieldTween.kill();
+    fieldTween = null;
+
+    /* A relock is a new encryption: fresh characters, seeded before
+       anything fades back in, never the ones that just left. */
+    if (next === 'locked') field.reseed();
+
+    if (!animate || !gsap) {
+      field.state.master = next === 'unlocked' ? 0 : 1;
+      field.draw();
+      return;
+    }
+
+    fieldTween = gsap.to(field.state, {
+      master: next === 'unlocked' ? 0 : 1,
+      duration: next === 'unlocked' ? FIELD_CLEAR_DUR : FIELD_RETURN_DUR,
+      delay: next === 'unlocked' ? FIELD_CLEAR_DELAY : FIELD_RETURN_DELAY,
+      ease: next === 'unlocked' ? 'power2.inOut' : 'power2.out',
+      /* The field's own loop paints every frame while the hero is
+         on screen; this covers the paused paths — offscreen, hidden
+         tab, reduced motion — so `master` never lands stale. */
+      onUpdate: () => field.draw(),
+    });
+  }
+
   function setState(next, { animate = false } = {}) {
     if (next !== 'locked' && next !== 'unlocked') return;
     const previous = state;
     state = next;
     paintState(next);
+
+    /* Before the `!scene` bail: with no WebGL there is no lock, but
+       there is still a hero and still a field, and it still belongs
+       to the site's lock state. */
+    const fieldPlayable = animate && !prefersReducedMotion && previous !== next;
+    moveField(next, fieldPlayable);
 
     if (!scene) return;
 
@@ -256,6 +309,8 @@ export function initLock({ prefersReducedMotion = false, gsap = null } = {}) {
     getState: () => state,
     is3D: () => !!scene,
     destroy: () => {
+      if (fieldTween) fieldTween.kill();
+      fieldTween = null;
       if (scene) scene.destroy();
       scene = null;
     },

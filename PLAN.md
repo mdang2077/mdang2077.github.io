@@ -14,6 +14,7 @@ committable, deployable site. Branch: `feat/v3-motion`. Never commit to `main`.
 | 4 | Unlock system — run log + pin rail + hero lock + bypass relock | **done** |
 | 5 | Section unlock — redraw scanline (`ANIMATIONS.md` effect A, then B) | **done** |
 | 5b | Relock — in-place scramble on bypass off | **done** |
+| 5c | Hero glyph field (`ANIMATIONS.md` effect C) | **done** |
 | 6 | Approved extras | *deferred — nothing approved* |
 | 7 | Polish + full audit | **done** |
 
@@ -1498,6 +1499,156 @@ capture above shows the lock's documented fallback (the stage collapses
 and the lockup closes to MARTIN DANG) rather than the lock. The lock
 itself was verified in phase 3 in a real browser and is untouched by
 this phase.
+
+---
+
+## Phase 5c — hero glyph field
+
+**Spec: `ANIMATIONS.md` §7 (Effect C).** That file is authoritative for the
+constants, the mask, the lock coupling and the reduced-motion behaviour. This
+section carries only the build order and what it touches in this repo.
+
+A fixed grid of glyphs behind the hero lockup, present while locked, clearing
+when the hero lock opens and returning on relock. Approved from a live prototype
+against a moving-stream variant, which was rejected: motion in a hero background
+competes with the type, and dimming it to compensate removes the effect.
+
+### 1. Both constants are locked
+
+`DENSITY = 1.00` and `CHURN = 0.01` — the maximum and minimum of the prototype's
+own sliders, chosen deliberately after seeing the range. `ANIMATIONS.md` §7.2
+records what they produce (~1440 cells, one reroll per frame, a given cell
+changing about once every 24 seconds) and which one to reach for first if it
+reads wrong on screen. **It is `CHURN`, never `DENSITY`.**
+
+### 2. What it touches
+
+- New `js/glyphfield.js` — the canvas, the grid, the rAF loop, one exported
+  `master` value.
+- `index.html` — one `<canvas aria-hidden="true">` inside the hero, `z-index: 0`,
+  below the existing scanline overlay and the lockup.
+- `js/lock.js` — the unlock and relock timelines each gain one tween against the
+  field's `master`. Nothing else about the field is GSAP-driven.
+- `css/tokens.css` — the glyph colour reads the existing "solved/active" green.
+
+No existing behaviour changes. The field is additive and can be removed by
+deleting the canvas and two tweens.
+
+### 3. Build order
+
+1. Canvas mounted, grid built, one static frame drawn at `master = 1`. Confirm
+   the mask kills the field behind the name before anything animates.
+2. rAF loop with the churn reroll and the ~400ms flash on changed cells.
+3. `IntersectionObserver` + `visibilitychange` pause. Do this in step 3, not in
+   polish — the hero leaves the viewport almost immediately and an unpaused loop
+   is easy to forget once the effect looks right.
+4. Couple to the lock: clear at +120ms into unlock, reseed and return on relock.
+5. Mobile cell budget, then reduced motion.
+
+### 4. Landmines
+
+- **The mask is not decoration.** Ship step 1 before step 2 and look at it. At
+  `DENSITY = 1.00` the name is unreadable without the falloff, at any opacity.
+- **The field must not be a DOM grid.** 1440 nodes repainting beside the WebGL
+  lock is the one thing this phase can do that would actually cost frames.
+- **The lock causes the clear**, 120ms behind the shackle lift. Same frame reads
+  as two unrelated things happening at once.
+- **Relock reseeds.** A fresh set of characters, not the ones that left.
+- **Light theme is undesigned.** Green at low alpha on the paper ground will be
+  invisible or dirty. Flag it rather than shipping a straight token swap; it may
+  need a different hue or a much higher alpha floor.
+
+### 5. Verification
+
+- Locked, at rest — the name and the lock are fully legible, no glyph within the
+  centre 40%.
+- Watch one cell for 30s — it changes. Watch the whole field for 30s — it reads
+  as still. Both are the intent.
+- Unlock — the field clears after the shackle lifts, not with it.
+- Relock — different characters return.
+- Scroll the hero out of view and back — the loop stops and restarts; check with
+  a paused profiler or a frame counter, not by eye.
+- Frame rate on a real phone with the WebGL lock running, hero on screen.
+- Reduced motion — the field renders once, never churns, still clears on unlock.
+- Screen reader — the canvas is not announced.
+
+### 6. Build notes — what shipped, and the six places it deviates
+
+Shipped as `js/glyphfield.js` (one module, ~330 lines), one `<canvas>` in
+`index.html`, one `.glyph-field` rule in `css/components.css`, and two tweens in
+`js/lock.js`. Build order was followed as written; step 1 was looked at on
+screen before the loop existed, and the mask does what §7.3 says it does.
+
+1. **The mobile rule is a budget, not a breakpoint.** §7.7 asks for the cell
+   count halved below 768px. That rule is written against "a 1440-cell grid on a
+   phone", which this hero never builds: the band is 390 x 197 at phone widths,
+   so the desktop advance already yields ~210 cells there, and halving *that*
+   produced a scatter of ~110 characters — the sparse, arbitrary look §7.2 warns
+   about, bought for a budget that was never in danger. The advance is now raised
+   only when a sub-768px viewport would exceed 700 cells, and only by enough to
+   land on it: portrait phones are untouched at ~210, a landscape phone trims 798
+   to 689, desktop is 1536. The type stays 13px either way, which is the part of
+   §7.7 that carries the intent.
+
+2. **The vertical mask stops are chosen here.** §7.3 gives the horizontal
+   falloff verbatim and only describes the vertical one. It is `0.00 -> 0.00`,
+   `0.12 -> 1.00`, `0.88 -> 1.00`, `1.00 -> 0.00` — short, and landing on zero at
+   both edges, because the grid is cut by the band's box and a half-drawn row of
+   glyphs along a straight edge reads as a rendering bug. The first pass held
+   0.25 at the edges and the cut was visible in the first screenshot.
+
+3. **Light theme ships provisional, and is still open.** §7.6 says the light
+   theme was never designed and must not be a token swap. It is not one: the
+   alpha floor and range are a separate pair (`0.10 / 0.22` against dark's
+   `0.22 / 0.6`), chosen only so the field is legible enough to judge. On screen
+   it reads as a faint wash rather than as ciphertext. **This still needs a
+   decision** — a different hue, a much higher floor, or no field in light at
+   all.
+
+4. **Layer order is the band's, not a hero-local stack.** §7.4's three-layer
+   diagram assumes a scanline overlay inside the hero. This page's grain and
+   scanline are fixed on `<body>` and render under the whole band, as they
+   already did for the lock. So the canvas is `z-index: 0` inside `.hero-band`,
+   and `.lockup` / `.pin-rail` were given `position: relative; z-index: 2` — an
+   absolutely positioned sibling paints over static content whatever the source
+   order, so without that the field would cover the name.
+
+5. **The field is cached, not redrawn.** Every glyph lives in an offscreen base
+   canvas at its own alpha; a reroll repaints one cell of it. A frame is one
+   `drawImage`, at most ~24 flash glyphs, and one `destination-in` composite of a
+   prebuilt mask. §7.4's landmine is about DOM nodes, but ~1500 `fillText` calls
+   a frame beside the WebGL lock would have been the same mistake in canvas form.
+
+6. **`js/lock.js` drives the field even with no lock.** The two tweens sit ahead
+   of the `if (!scene) return` bail. If Three never loads the lockup collapses to
+   MARTIN DANG, but there is still a hero and the field still belongs to the
+   site's lock state.
+
+### 7. Verification — what was run, and what it said
+
+Headless Chrome over CDP at 1440x900, 390x844 and 844x390, against the real page
+with the WebGL lock running.
+
+- **Locked, at rest** — name and lock legible, centre band clear. Confirmed on
+  screen at 1440. On a phone the cleared band is 164px wide against proportionally
+  larger type, so the words sit closer to the glyphs; still legible, worth a look
+  on real hardware.
+- **Churn** — a canvas hash sampled 900ms apart changes while the hero is on
+  screen.
+- **Offscreen pause** — the same hash is *identical* across 900ms scrolled away,
+  and changes again on return. Measured, not eyeballed.
+- **Unlock** — at 500ms after bypass the shackle is lifting and the field is
+  still up; by 2s it is gone. The clear trails the lock, which is §7.5's point.
+- **Relock** — the returning field is a different set of characters.
+- **Reduced motion** — hash unchanged over 1s (one frame, no loop), and the field
+  still clears to nothing on unlock.
+- **Screen reader** — `aria-hidden="true"` on the canvas; it is not in the tree.
+- **Console** — no errors on any path.
+- **Not verified: frame rate on real phone hardware.** The rAF count in headless
+  swiftshader is not a frame rate. The cell budget is ~210 on a phone and the
+  per-frame work is one `drawImage`, but this wants a real device.
+
+---
 
 ## Decisions carried from the brief (do not re-litigate)
 
