@@ -340,14 +340,21 @@ Freshly changed cells draw in a tint of that ink. No hardcoded hex.
 
 **Light — resolved, was open work.** The prediction held: the green went
 grey-olive on the warm ground, the dirty outcome rather than the invisible one.
-It is **ink blue `#2f4260`**, per-cell alpha `0.10 + random*0.22`, chosen off a
+It is **ink blue `#2f4260`**, per-cell alpha `0.40 + random*0.45`, chosen off a
 four-hue sweep on the real page (sepia disappeared into the paper, graphite was
 hueless, teal landed back on the grey-olive problem). Ink blue is cool against a
 warm ground so it separates rather than muddies, it reads as printed characters
 rather than as a wash, and it belongs to neither the locked red nor the solved
-green — so the field never looks like it is signalling state. The lower alpha is
-not a dimmer green: dark ink on a light ground at the dark theme's alphas puts
-the field in front of the name.
+green — so the field never looks like it is signalling state.
+
+**Light's alpha is higher than dark's, not lower.** The intuition that dark ink
+on a light ground needs less of it is wrong here, and `0.10 + random*0.22` was
+tried first and rejected on screen: between flashes the field stopped reading as
+characters at all. The mask is the reason — it caps most of the field at 0.55 and
+the centre at 0, so this floor is the alpha *before* the falloff takes about half
+of it back. The name is not at risk from the top of the range: the mask is 0
+where the type sits densest, and the worst pair behind any letter is ~6.3:1
+against the paper.
 
 **The flash target is the page's text colour, not white.** "Near-white tint"
 holds only in the dark; on paper a near-white flash makes the changed glyph

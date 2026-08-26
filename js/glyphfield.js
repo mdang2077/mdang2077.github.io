@@ -187,15 +187,25 @@ export function initGlyphField({ prefersReducedMotion = false } = {}) {
   }
 
   /* ── THE TWO ALPHA RANGES ───────────────────────────────────
-     Not one range with a swapped colour. Dark is §7.6's
-     `0.22 + random*0.6` verbatim; light is lower because its ink
-     (`--light-field-ink`) is dark on a light ground rather than
-     bright on a dark one, and the same numbers there would put the
-     field in front of the name instead of behind it. Both were
-     chosen against the real page, in both themes. */
+     Dark is §7.6's `0.22 + random*0.6` verbatim.
+
+     Light is its own pair, and it is *higher*, which is the opposite
+     of where this started. The first pass reasoned that dark ink on
+     a light ground needs less alpha than bright ink on a dark one
+     and set 0.10/0.22 — on screen that put the field below the
+     threshold where it reads as characters at all between flashes,
+     which is the whole effect. The horizontal mask is why: it caps
+     most of the field at 0.55 and the centre at 0, so the floor here
+     is not the alpha you see, it is the alpha before the falloff
+     takes roughly half of it back.
+
+     Chosen off a four-step sweep on the real page. The name is not
+     at risk from the top of this range: the mask is 0 where the type
+     sits densest, and the worst pair anywhere behind a letter is
+     ~6.3:1 against the paper — comfortably AA for display type. */
   const ALPHA = {
     dark: { floor: 0.22, range: 0.6 },
-    light: { floor: 0.1, range: 0.22 },
+    light: { floor: 0.4, range: 0.45 },
   };
 
   const alphaScale = () =>

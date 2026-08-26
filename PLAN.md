@@ -1603,7 +1603,13 @@ screen before the loop existed, and the mask does what §7.3 says it does.
    outcome §7.6 predicted. Four hues were then rendered on the real page at
    identical alphas and reviewed: **ink blue `#2f4260`** was chosen (sepia
    `#6b4f35` vanished into the paper, graphite `#3b4450` was hueless, teal
-   `#1f5a5a` landed back on grey-olive). The colour moved behind a new
+   `#1f5a5a` landed back on grey-olive). The weight then went **up**, not down:
+   the first light pair (`0.10 / 0.22`) reasoned that dark ink on a light ground
+   needs less alpha than bright ink on a dark one, and on screen that put the
+   field below the threshold where it reads as characters between flashes. A
+   four-step sweep landed on `0.40 / 0.45`. The mask is what makes that safe and
+   what made the low pair fail — it caps most cells at 0.55 and the centre at 0,
+   so the floor is not the alpha anyone sees. The colour moved behind a new
    `--field-ink` token — dark resolves it to the solved green, light to
    `--light-field-ink` — rather than a use-site override, because this is the one
    effect whose two themes disagree about what it is made of.
