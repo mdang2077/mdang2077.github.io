@@ -12,7 +12,7 @@
      `clip-path` on both panes
      the stage's inline `height`, and only while sweeping
      the beam's `top`
-     `textContent` on the text leaves of both panes, and only
+     the text nodes of both panes, and only
        while relocking
      `filter` and `opacity` on both panes, likewise
      `aria-busy` on the stage, likewise
@@ -144,7 +144,7 @@ const glyph = () => GLYPH[(Math.random() * GLYPH.length) | 0];
    eating inward from the right. In: the reverse, resolving from
    the right. */
 function scrambleOut(target, u) {
-  const t = target.el.dataset.txt;
+  const t = target.txt;
   const from = t.length - Math.floor(u * t.length);
   target.write(
     [...t].map((c, i) => (i >= from && c !== ' ' ? glyph() : c)).join(''),
@@ -152,50 +152,54 @@ function scrambleOut(target, u) {
 }
 
 function scrambleIn(target, u) {
-  const t = target.el.dataset.txt;
+  const t = target.txt;
   const from = t.length - Math.floor(u * t.length);
   target.write(
     [...t].map((c, i) => (i >= from || c === ' ' ? c : glyph())).join(''),
   );
 }
 
-/* Leaves only. Writing `textContent` on a container replaces its
-   children with a string, so one wrong selector here deletes every
-   pill in the pane. An element with no element children cannot be
-   that mistake.
+/* Text nodes, not elements. A project description holds
+   highlighted keywords as child spans, so an element-level pass
+   would either skip the description (it has element children) or,
+   writing `textContent` on it, delete the spans. Writing a text
+   node's `nodeValue` can do neither: it touches that run of text
+   and nothing else, and a span's text is just another node.
 
-   Empty ones are skipped because there is nothing to scramble, and
-   `.visually-hidden` ones because scrambling text nobody can see
-   buys nothing and hands a screen reader garbage. */
-function leaves(pane) {
-  return Array.from(pane.querySelectorAll('*')).filter(
-    (el) =>
-      !el.firstElementChild &&
-      !el.classList.contains('visually-hidden') &&
-      el.textContent.trim() !== '',
-  );
+   Whitespace-only nodes are skipped because there is nothing to
+   scramble, and anything under `.visually-hidden` because
+   scrambling text nobody can see buys nothing and hands a screen
+   reader garbage. */
+function textNodes(pane) {
+  const walker = document.createTreeWalker(pane, NodeFilter.SHOW_TEXT, {
+    acceptNode: (node) =>
+      node.nodeValue.trim() !== '' &&
+      !node.parentElement.closest('.visually-hidden')
+        ? NodeFilter.FILTER_ACCEPT
+        : NodeFilter.FILTER_REJECT,
+  });
+  const list = [];
+  while (walker.nextNode()) list.push(walker.currentNode);
+  return list;
 }
 
 /* A target is anything in the pane showing a string, which is the
-   text leaves plus one thing that is not a text node at all: the
+   text nodes plus one thing that is not a text node at all: the
    answer input's placeholder. It is the only English left on the
    card once the rest is ciphertext, and one legible line in the
    middle of a decrypt is exactly the seam the effect is trying not
-   to have. The indirection exists for that one case; an element is
-   never both, because an input's `textContent` is empty and so it
-   never reaches `leaves`. */
+   to have. The indirection exists for that one case; an input has
+   no text node, so it is never both. */
 function targets(pane) {
-  const list = leaves(pane).map((el) => ({
-    el,
-    read: () => el.textContent,
+  const list = textNodes(pane).map((node) => ({
+    read: () => node.nodeValue,
     write: (v) => {
-      el.textContent = v;
+      node.nodeValue = v;
     },
   }));
 
   pane.querySelectorAll('[placeholder]').forEach((el) => {
     list.push({
-      el,
       read: () => el.placeholder,
       write: (v) => {
         el.placeholder = v;
@@ -211,14 +215,14 @@ function targets(pane) {
    would bake them in permanently. */
 function cache(list) {
   list.forEach((t) => {
-    t.el.dataset.txt = t.read();
+    t.txt = t.read();
   });
   return list;
 }
 
 function restore(list) {
   list.forEach((t) => {
-    if (t.el.dataset.txt !== undefined) t.write(t.el.dataset.txt);
+    if (t.txt !== undefined) t.write(t.txt);
   });
 }
 
@@ -349,7 +353,7 @@ export function initReveal({ gsap = null, prefersReducedMotion = false } = {}) {
     /* Plain text back on every leaf before anything else can read
        it. A relock torn down mid-flight — bypass thrown straight
        back on, the safety timer firing — must not leave glyphs in
-       the DOM, and must not leave `dataset.txt` as the only copy of
+       the DOM, and must not leave the cached `txt` as the only copy of
        the real string. */
     if (item.leaves) {
       restore(item.leaves);

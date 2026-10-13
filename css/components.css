@@ -1058,6 +1058,15 @@
   line-height: 1.75;
 }
 
+/* Keywords sit between the description and the title: mixed from
+   the two text tokens rather than given hex of their own, so each
+   theme gets its own midpoint for free. Weight stays put; the
+   emphasis is brightness only. */
+.project-desc .kw {
+  color: color-mix(in oklab, var(--text) 70%, var(--text-muted));
+  font-weight: inherit;
+}
+
 /* ── ACCESS GRANTED PANEL ────────────────────────────────── */
 .granted {
   border: var(--border-hair) solid var(--accent);
